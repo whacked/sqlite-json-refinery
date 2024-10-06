@@ -1,3 +1,6 @@
+build: common_payload_data.go transformations.go
+	go build -o sjr *.go
+
 update-jdxd:
 	go get -u github.com/whacked/jdxd@main
 
