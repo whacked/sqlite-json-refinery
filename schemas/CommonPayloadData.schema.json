@@ -1,0 +1,48 @@
+{
+  "description": "main table for storing and tracking data",
+  "properties": {
+    "device": {
+      "description": "name of the device from which the data is collected",
+      "examples": [
+        "rpizero-2",
+        "cli",
+        "app@2.1"
+      ],
+      "type": "string"
+    },
+    "disabled": {
+      "description": "marks data to be skipped",
+      "type": "integer"
+    },
+    "id": {
+      "description": "auto-generated primary key",
+      "type": "integer"
+    },
+    "payload": {
+      "description": "raw data: json payloads, json schema content, transformer code",
+      "type": "string"
+    },
+    "payload_type": {
+      "description": "for internal organization; raw: raw payload data; schema: json schema; transformer: jsonata (later also jsonnet) data transformer; derived: post-transform data",
+      "enum": [
+        "raw",
+        "schema",
+        "transformer",
+        "derived"
+      ],
+      "type": "string"
+    },
+    "time": {
+      "type": "number"
+    },
+    "time_added": {
+      "type": "number"
+    },
+    "topic": {
+      "description": "maps directly to the MQTT topic, but is otherwise an arbitrary \"project\"/\"group\"-like identifier",
+      "type": "string"
+    }
+  },
+  "title": "CommonPayloadData",
+  "type": "object"
+}

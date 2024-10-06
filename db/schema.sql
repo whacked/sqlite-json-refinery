@@ -1,3 +1,5 @@
+-- TODO: this needs to be synced and generated with the jsonnet schemas
+
 CREATE TABLE IF NOT EXISTS CommonPayloadData (
     id INTEGER PRIMARY KEY,
     time INTEGER NOT NULL,
