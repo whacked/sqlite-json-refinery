@@ -37,6 +37,10 @@ in pkgs.mkShell {
     pkgs.go
     pkgs.sqlite
     go-jsonschema
+  ] ++ [
+    # frontend
+    pkgs.nodePackages.pnpm
+
   ];
 
   shellHook = ''
