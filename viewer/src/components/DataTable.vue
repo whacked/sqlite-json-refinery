@@ -7,7 +7,9 @@
     </div>
     <div class="ag-theme-alpine" style="height: 500px; width: 100%;">
       <div>
-        {{ dataStore.totalRows }} rows
+        {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${dataStore.totalRows} rows visible
+        (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
+        }}
       </div>
       <ag-grid-vue
         style="height: 100%; border: 4px dashed orange;"
@@ -24,6 +26,9 @@
         :infiniteInitialRowCount="infiniteInitialRowCount"
 
         @grid-ready="onGridReady"
+        @model-updated="onModelUpdated"
+        @first-data-rendered="onFirstDataRendered"
+        @body-scroll="onBodyScroll"
       >
       </ag-grid-vue>
     </div>
@@ -38,9 +43,9 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, defineComponent, h } from 'vue';
+import { ref, onMounted, reactive, defineComponent, h, computed } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { ColDef, GridApi, GridReadyEvent, paramValueToCss } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, paramValueToCss } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import PayloadCell from '@/components/PayloadCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
@@ -96,6 +101,42 @@ const quickFilterText = ref('');
 const gridApi = ref<GridApi | null>(null);
 const rowData = ref<any[]>([]);
 
+
+namespace TableRowPositionStatus {
+
+export const totalRows = ref(0);
+export const visibleRows = ref(0);
+export const firstVisibleRow = ref(0);
+export const lastVisibleRow = ref(0);
+}
+
+
+const onBodyScroll = (event: BodyScrollEvent) => {
+  updateRowCount();
+}
+
+const currentDisplayedRowsRange = ref('');
+
+const onModelUpdated = () => {
+  console.log("updated")
+  updateRowCount();
+};
+
+const onFirstDataRendered = () => {
+  updateRowCount();
+};
+
+const updateRowCount = () => {
+  if (!gridApi.value) return;
+  TableRowPositionStatus.totalRows.value = dataStore.totalRows;
+  TableRowPositionStatus.visibleRows.value = gridApi.value.getDisplayedRowCount();
+  TableRowPositionStatus.firstVisibleRow.value = gridApi.value.getFirstDisplayedRow() + 1;
+  TableRowPositionStatus.lastVisibleRow.value = gridApi.value.getLastDisplayedRow() + 1;
+  currentDisplayedRowsRange.value = `${TableRowPositionStatus.firstVisibleRow.value}-${TableRowPositionStatus.lastVisibleRow.value}`;
+};
+
+
+
 const defaultColDef = reactive({
   flex: 1,
   minWidth: 100,
@@ -112,7 +153,9 @@ const infiniteInitialRowCount = 1;
 const onGridReady = (params: GridReadyEvent) => {
   gridApi.value = params.api;
   fetchData();
+  updateRowCount();
 };
+
 
 const fetchData = async () => {
   const data = await dataStore.fetchData(0, dataStore.totalRows);
