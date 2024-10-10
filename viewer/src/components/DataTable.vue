@@ -2,6 +2,8 @@
   <div>
     <div class="filters">
       <input v-model="quickFilterText" placeholder="Quick filter..." @input="onQuickFilterChanged" />
+      <button @click="expandAllRows">Expand All</button>
+      <button @click="contractAllRows">Contract All</button>
     </div>
     <div class="ag-theme-alpine" style="height: 500px; width: 100%;">
       <div>
@@ -10,18 +12,20 @@
       <ag-grid-vue
         style="height: 100%; border: 4px dashed orange;"
         class="ag-theme-quartz"
-
         :columnDefs="columnDefs"
-        :datasource="datasource"
-        
+        :rowData="rowData"
         :defaultColDef="defaultColDef"
+        :components="components"
+
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
         :paginationPageSize="paginationPageSize"
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
+
         @grid-ready="onGridReady"
-      />
+      >
+      </ag-grid-vue>
     </div>
   </div>
 </template>
@@ -31,56 +35,66 @@
   margin-bottom: 10px;
 }
 
-.ag-theme-quartz {
-    --ag-header-column-separator-display: block;
-    --ag-header-column-separator-height: 100%;
-    --ag-header-column-separator-width: 2px;
-    --ag-header-column-separator-color: purple;
-
-    --ag-header-column-resize-handle-display: block;
-    --ag-header-column-resize-handle-height: 25%;
-    --ag-header-column-resize-handle-width: 5px;
-    --ag-header-column-resize-handle-color: orange;
-    
-}
-
-.ag-header-group-cell.ag-column-first {
-    background-color: #2244CC66;
-    color: white;
-}
-.ag-header-cell.ag-column-first {
-    background-color: #2244CC44;
-    color: white;
-}
-.ag-floating-filter.ag-column-first {
-    background-color: #2244CC22;
-}
-
-.ag-header-group-cell.ag-column-last {
-    background-color: #33CC3366;
-}
-.ag-header-cell.ag-column-last {
-    background-color: #33CC3344;
-}
-.ag-floating-filter.ag-column-last {
-    background-color: #33CC3322;
-}
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, defineComponent, h } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { ColDef, GridApi, GridReadyEvent, IDatasource } from 'ag-grid-community';
+import { ColDef, GridApi, GridReadyEvent, paramValueToCss } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
-import { useWindowingService } from '@/services/windowingService';
+import PayloadCell from '@/components/PayloadCell.vue';
+import * as ColumnManager from '@/utils/columnManager';
+
+const customHeader = defineComponent({
+  props: ['displayName', 'onCustomAction'],
+  setup(props) {
+    //@ts-ignore  this is correct, but flagged by the linter
+    const params = props.params;
+    const sortOrder = ref(params.column.getSort());
+
+    const collapseKey = () => {
+      const keyToRemove = params.key;
+      ColumnManager.expandedKeys.value.delete(keyToRemove);
+      updateColumnDefs();
+    };
+
+    const onSortClicked = (event: MouseEvent) => {
+      params.progressSort(event.shiftKey);
+      sortOrder.value = params.column.getSort();
+    };
+
+    params.column.addEventListener('sortChanged', () => {
+      sortOrder.value = params.column.getSort();
+    });
+
+    return () => h('div', { class: 'ag-header-cell-label' }, [
+      h('span', { class: 'ag-header-cell-text' }, params.displayName),
+      h('button', {
+        class: 'ag-my-sort-button',
+        onClick: onSortClicked
+      }, (
+        sortOrder.value === "asc" ? '▲' : 
+        sortOrder.value === "desc" ? '▼' : '⇅'
+      )),
+      h('button', {
+        class: 'ag-my-collapse-button',
+        onClick: collapseKey
+      }, '✖'),
+    ]);
+  }
+});
+
+const components = {
+  customHeader,
+  payloadCellRenderer: PayloadCell,
+};
 
 const dataStore = useDataStore();
-const windowingService = useWindowingService(50); // pageSize of 50
 
 const columnDefs = ref<ColDef[]>([]);
 const quickFilterText = ref('');
-
 const gridApi = ref<GridApi | null>(null);
+const rowData = ref<any[]>([]);
 
 const defaultColDef = reactive({
   flex: 1,
@@ -90,79 +104,120 @@ const defaultColDef = reactive({
 });
 
 const rowBuffer = 0;
-const rowModelType = 'infinite';
+const rowModelType = 'clientSide';
 const paginationPageSize = 10;
 const cacheBlockSize = 10;
 const infiniteInitialRowCount = 1;
 
- 
-const datasource: IDatasource = {
-  getRows: (params) => {
-    const startRow = params.startRow;
-    const endRow = params.endRow;
-    
-    console.log(`Requesting rows from ${startRow} to ${endRow}`);
-    
-    dataStore.fetchData(startRow, endRow).then((data) => {
-      if (columnDefs.value.length === 0) {
-        columnDefs.value = generateColumnDefs(data);
-        console.log('Generated column definitions:', columnDefs.value);
-      }
-      
-      const lastRow = data.length < endRow - startRow ? startRow + data.length : undefined;
-      
-      console.log(`Received ${data.length} rows; lastRow: ${lastRow}`);
-      console.log(params)
-      console.log(data.slice(0, 3))
-      params.successCallback(data, lastRow);
-    });
-  }
-};
-// */
-
 const onGridReady = (params: GridReadyEvent) => {
   gridApi.value = params.api;
-  // columnApi.value = params.columnApi;
-  console.log('Grid ready', params, dataStore.totalRows);
-  windowingService.setTotalItems(dataStore.totalRows);
+  fetchData();
 };
 
-const generateColumnDefs = (dataRows: any[]): ColDef[] => {
-  const discoveredColumns = new Set<string>()
-  const orderedColumns: ColDef[] = []
+const fetchData = async () => {
+  const data = await dataStore.fetchData(0, dataStore.totalRows);
+  rowData.value = data.map(row => ({
+    ...row,
+    payloadString: row.payload,
+    payload: JSON.parse(row.payload)
+  }));
+  updateColumnDefs();
+};
 
-  dataRows.forEach((row) => {
-    Object.keys(row).forEach((key) => {
-      if(discoveredColumns.has(key)) {
-        return
-      }
-      discoveredColumns.add(key)  
-      orderedColumns.push({
-        field: key,
-        headerName: key,
-        width: Math.floor(Math.random() * 150) + 100, // Random width between 100 and 250
-        resizable: Math.random() > 0.5, // Randomly resizable
-        sortable: Math.random() > 0.3, // More likely to be sortable
-        filter: Math.random() > 0.4 ? 'agTextColumnFilter' : false, // Randomly add text filter
-        cellStyle: { 
-          color: ['#000000', '#333333', '#666666'][Math.floor(Math.random() * 3)], // Random text color
-          fontWeight: Math.random() > 0.7 ? 'bold' : 'normal', // Occasionally bold
-          textAlign: ['left', 'center', 'right'][Math.floor(Math.random() * 3)] // Random alignment
-        },
-        headerClass: Math.random() > 0.5 ? 'custom-header' : '', // Randomly add a custom header class
-      })
-    })
-  })
+const updateColumnDefs = () => {
+  const cellRendererParams: ColumnManager.RenderParams = {
+    expandedKeys: ColumnManager.expandedKeys.value,
+    toggleExpand: toggleExpandKeys,
+    toggleContract: toggleContractKeys,
+  };
+  const baseColumns: ColDef[] = [
+    { field: 'id', headerName: 'ID', width: 100 },
+    { field: 'country', headerName: 'Country', width: 150 },
+    { field: 'createdAt', headerName: 'Created At', width: 200 },
+    { 
+      field: 'payloadString', 
+      headerName: 'Payload String (not shown; for filtering)', 
+      hide: true 
+    },
+    { 
+      field: 'payload', 
+      headerName: 'Payload', 
+      width: 300, 
+      cellRenderer: 'payloadCellRenderer',
+      cellRendererParams: cellRendererParams,
+    },
+  ];
 
-  return orderedColumns
+  const derivedColumns: ColDef[] = Array.from(ColumnManager.expandedKeys.value)
+    .sort((a, b) => a.localeCompare(b))
+    .map(key => ({
+      field: `payload.${key}`,
+      headerName: key,
+      width: 150,
+      cellStyle: { backgroundColor: '#e6f7ff' },
+      /* headerComponent: 'agColumnHeader', */
+      headerComponent: customHeader,
+       headerComponentParams: {
+        key: key,
+      },
+    }));
+
+  columnDefs.value = [...baseColumns, ...derivedColumns];
+
+};
+
+const toggleExpandKeys = (id: string) => {
+  if (ColumnManager.expandedRows.value.has(id)) {
+    ColumnManager.expandedRows.value.delete(id);
+  } else {
+    ColumnManager.expandedRows.value.add(id);
+    const row = rowData.value.find(r => r.id === id);
+    if (row) {
+      Object.keys(row.payload).forEach(key => ColumnManager.expandedKeys.value.add(key));
+    }
+  }
+  updateColumnDefs();
+};
+
+const toggleContractKeys = (id: string) => {
+  if (!ColumnManager.expandedRows.value.has(id)) {
+    return;
+  } else {
+    ColumnManager.expandedRows.value.delete(id);
+    const row = rowData.value.find(r => r.id === id);
+    if (row) {
+      Object.keys(row.payload).forEach(key => ColumnManager.expandedKeys.value.delete(key));
+    }
+  }
+  updateColumnDefs();
+}
+
+const expandAllRows = () => {
+  rowData.value.forEach(row => {
+    ColumnManager.expandedRows.value.add(row.id);
+    Object.keys(row.payload).forEach(key => ColumnManager.expandedKeys.value.add(key));
+  });
+  updateColumnDefs();
+};
+
+const contractAllRows = () => {
+  ColumnManager.expandedRows.value.clear();
+  ColumnManager.expandedKeys.value.clear();
+  updateColumnDefs();
 };
 
 const onQuickFilterChanged = () => {
-  quickFilterText.value = quickFilterText.value.trim();
-  console.log('Quick filter changed to:', quickFilterText.value);
+  console.log(quickFilterText.value.trim());
+  gridApi.value?.setColumnFilterModel('payloadString', {
+    filterType: 'text',
+    type: 'contains',
+    filter: quickFilterText.value.trim(),
+  });
+  gridApi.value?.onFilterChanged();
 };
 
 onMounted(() => {
-  dataStore.initializeData();
+  fetchData();
 });
+
 </script>

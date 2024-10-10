@@ -25,9 +25,6 @@ a:hover {
 body {
   margin: 0;
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
 }
 
 h1 {
@@ -59,10 +56,8 @@ button:focus-visible {
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  margin: 0;
+  width: 100%;
 }
 
 @media (prefers-color-scheme: light) {
@@ -76,4 +71,66 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* ag overrides */
+.ag-header-cell-label {
+  display: flex;
+}
+.ag-header-cell-text {
+  flex: 1;
+}
+
+.ag-theme-quartz {
+  --ag-header-column-separator-display: block;
+  --ag-header-column-separator-height: 100%;
+  --ag-header-column-separator-width: 2px;
+  --ag-header-column-separator-color: purple;
+
+  --ag-header-column-resize-handle-display: block;
+  --ag-header-column-resize-handle-height: 25%;
+  --ag-header-column-resize-handle-width: 5px;
+  --ag-header-column-resize-handle-color: orange;
+}
+
+.ag-theme-quartz .ag-cell {
+  text-align: left;
+}
+
+.ag-header-group-cell.ag-column-first {
+  background-color: #2244cc66;
+  color: white;
+}
+.ag-header-cell.ag-column-first {
+  background-color: #2244cc44;
+  color: white;
+}
+.ag-floating-filter.ag-column-first {
+  background-color: #2244cc22;
+}
+
+.ag-header-group-cell.ag-column-last {
+  background-color: #33cc3366;
+}
+.ag-header-cell.ag-column-last {
+  background-color: #33cc3344;
+}
+.ag-floating-filter.ag-column-last {
+  background-color: #33cc3322;
+}
+
+.ag-my-sort-button {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  padding: 0;
+  width: 1em;
+}
+
+.ag-my-collapse-button {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  padding: 0;
+  width: 1em;
 }
