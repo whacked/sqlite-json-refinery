@@ -18,8 +18,9 @@
 
 
 
-
+  <button @click="loadNewFile">Load JSONL File</button>
   <ag-grid-vue
+    v-if="fileCache.length > 0"
     class="ag-theme-alpine"
     style="height: 500px; width: 100%;"
     :columnDefs="columnDefs2"
@@ -77,19 +78,30 @@ const colDefs = ref([
 
 
 
-import { ColDef, GridApi, GridReadyEvent, IDatasource } from 'ag-grid-community';
+import { ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
 import { faker } from '@faker-js/faker';
 
+
+// TODO move this to autogen
+interface CommonPayloadData {
+  time: number;
+  category: string;
+  entry: string;
+  payload: Record<string, string>;
+}
+const commonKeys = new Set(['time', 'category', 'entry', 'payload']);
+
+
 // Fake data generator
-const generateFakeRow = (index: number) => ({
-  id: index,
-  name: faker.person.fullName(),
-  email: faker.internet.email(),
-  city: faker.location.city()
+const generateFakeRow = (index: number): CommonPayloadData => ({
+  time: index,
+  category: faker.location.city(),
+  entry: faker.person.fullName(),
+  payload: { email: faker.internet.email() },
 });
 
 // Fake async data fetcher
-const fetchData2 = (startRow: number, endRow: number): Promise<any[]> => {
+const fetchData2_ = (startRow: number, endRow: number): Promise<CommonPayloadData[]> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       const rowData = [];
@@ -103,10 +115,43 @@ const fetchData2 = (startRow: number, endRow: number): Promise<any[]> => {
 
 const gridApi2 = ref<GridApi | null>(null);
 const columnDefs2 = ref<ColDef[]>([
-  { field: 'id' },
-  { field: 'name' },
-  { field: 'email' },
-  { field: 'city' }
+  {
+    headerName: "#",
+    valueGetter: (params: ValueGetterParams) => {
+      return (params.node?.rowIndex ?? 0) + 1;
+    },
+    width: 80,
+  },
+  { field: 'time' },
+  { field: 'category' },
+  { field: 'entry' },
+  {
+    headerName: 'Extra Data',
+    valueGetter: (params: ValueGetterParams) => {
+      // return a canonicalized json string of the payload
+      // whose keys are not included in the default key list
+      const allData: any = params.data ?? {};
+      const filteredPayload = Object.keys(allData).filter(
+        key => !commonKeys.has(key)).reduce((obj: Record<string, string>, key) => {
+          obj[key] = allData[key];
+          return obj;
+        }, {});
+      return filteredPayload;
+    },
+    headerClass: 'my-ag-table-derived-column',
+    cellStyle: {
+      'background-color': 'pistachio',
+    },
+    cellRenderer: (params: CellRendererParams) => {
+      const stringRepresentation = JSON.stringify(params.value);
+      const numKeys = Object.keys(params.value).length;
+      return `<button onclick="alert(${numKeys})">(${numKeys}) ${stringRepresentation}</button>`;
+    },
+    cellRendererParams: {
+      onClick: () => alert('Button clicked'),
+    },
+  },
+  { field: 'payload' },
 ]);
 
 const onGridReady2 = (params: GridReadyEvent) => {
@@ -125,14 +170,93 @@ const onGridReady2 = (params: GridReadyEvent) => {
   params.api.setDatasource(dataSource); */
 };
 
+interface RowFetchWindow {
+  rows: any[],
+  startIndex: number,
+  endIndex: number,
+  totalRowCount: number,
+}
 
 const dataSource2 = ref<IDatasource>({
   getRows: (params) => {
     console.log('Fetching rows:', params.startRow, 'to', params.endRow);
     fetchData2(params.startRow, params.endRow).then(rowData => {
-      params.successCallback(rowData, 100000); // Assume 100,000 total rows
+      params.successCallback(rowData.rows, rowData.totalRowCount);
     });
   }
 });
 
+
+async function getFileHandle() {
+  if ('showOpenFilePicker' in window) {
+    const [handle] = await (window as any).showOpenFilePicker();
+    return handle;
+  } else {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.onchange = (e) => resolve((e.target as HTMLInputElement).files?.[0]);
+      input.click();
+    });
+  }
+}
+
+const fileCache = ref<any[]>([]);
+
+async function loadFile() {
+  const fileHandle = await getFileHandle();
+  const file = 'getFile' in fileHandle ? await fileHandle.getFile() : fileHandle;
+  const text = await file.text();
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    if (line.trim() !== '') {
+      try {
+        const parsedLine = JSON.parse(line);
+        fileCache.value.push(parsedLine);
+      } catch (error) {
+        console.error('Error parsing line:', line);
+        console.error(error);
+      }
+    }
+  }
+  console.log('fileCache length:', fileCache.value.length);
+}
+
+
+const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWindow> => {
+  console.log(fileCache.value)
+
+  if (fileCache.value.length >= endRow) {
+    return {
+      rows: fileCache.value.slice(startRow, endRow),
+      startIndex: startRow,
+      endIndex: endRow,
+      totalRowCount: fileCache.value.length,
+    };
+  }
+
+  return {
+    rows: [],
+    startIndex: 0,
+    endIndex: 0,
+    totalRowCount: 0,
+  };
+
+  if (fileCache.value.length === 0) {
+    await loadFile();
+  }
+
+  return {
+    rows: fileCache.value.slice(startRow, endRow),
+    startIndex: startRow,
+    endIndex: endRow,
+    totalRowCount: fileCache.value.length,
+  };
+};
+
+
+const loadNewFile = async () => {
+  await loadFile();
+};
 </script>

@@ -7,10 +7,6 @@
 </template>
 
 <style scoped>
-.contract {
-    background-color: red;
-    padding: 0;
-}
 </style>
 
 <script setup lang="ts">
@@ -29,7 +25,7 @@ function renderParams(payload: any) {
     let numKeys = 0;
     const reducedPayload: Record<string, any> = {};
     for (const key of Object.keys(payload)) {
-        if (props.params.expandedKeys.has(key)) {
+        if (props.params.payloadExtractedKeys.has(key)) {
             continue;
         }
         reducedPayload[key] = payload[key];
@@ -46,6 +42,6 @@ function renderParams(payload: any) {
     }
 }
 
-const toggleExpand = () => props.params.toggleExpand(props.params.data.id);
+const toggleExpand = () => props.params.toggleExpandPayloadKeys(props.params.data.id);
 
 </script>

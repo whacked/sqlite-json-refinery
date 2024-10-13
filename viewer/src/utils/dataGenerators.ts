@@ -23,6 +23,16 @@ export function generateData(count: number) {
       const columnName = `e-${i}`;
       extraData[columnName] = faker.lorem.words()
     }
-    return { ...sharedShapeData, payload: JSON.stringify(extraData) }
+
+    const extraNonPayloadData: { [key: string]: any } = {}
+    for (let i = 0; i < 4; ++i) {
+      if (Math.random() < 0.5) {
+        continue;
+      }
+      const columnName = `x${i}`;
+      extraNonPayloadData[columnName] = faker.animal.type()
+    }
+
+    return { ...sharedShapeData, payload: JSON.stringify(extraData), ...extraNonPayloadData }
   })
 }

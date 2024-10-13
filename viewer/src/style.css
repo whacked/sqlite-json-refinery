@@ -113,7 +113,7 @@ button:focus-visible {
   background-color: #33cc3366;
 }
 .ag-header-cell.ag-column-last {
-  background-color: #33cc3344;
+  /* background-color: #33cc3344; */
 }
 .ag-floating-filter.ag-column-last {
   background-color: #33cc3322;
@@ -133,4 +133,34 @@ button:focus-visible {
   font-size: 16px;
   padding: 0;
   width: 1em;
+}
+
+.my-ag-table-extra-data-header {
+  background: #92400e;
+}
+.my-ag-table-extra-data-cell button {
+  border-color: #92400e;
+  color: #92400e;
+  border-width: 1px;
+}
+.my-ag-table-extra-data-expanded-column {
+  background: #ef9259;
+}
+.my-ag-table-extra-data-expanded-cell {
+  background: #fce8dc;
+}
+
+.my-ag-table-payload-header {
+  background: #0c4a6e;
+}
+.my-ag-table-payload-cell button {
+  border-color: #0c4a6e;
+  color: #0c4a6e;
+  border-width: 1px;
+}
+.my-ag-table-payload-expanded-column {
+  background: #4db1ec;
+}
+.my-ag-table-payload-expanded-cell {
+  background: #d9eefb;
 }
