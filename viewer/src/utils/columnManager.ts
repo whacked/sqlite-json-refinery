@@ -1,16 +1,24 @@
 import { ref } from 'vue';
 
 export const coreDisplayParams = ref(new Set<string>([
-    'id',
+    // FIXME -- need more flexible setup
+    // sample columns
+    /* 'id',
     'country',
-    'createdAt',
+    'createdAt', */
+
+    'time',
+    'topic',
+    'category',
+    'entry',
+
     'payload',
     // derived columns
     'payloadString',
     'extraData',
     'extraDataString',
-
 ]));
+
 export const expandedPayloadRows = ref(new Set<string>());
 export const expandedPayloadKeys = ref(new Set<string>());
 export const extractedDataExpandedRows = ref(new Set<string>());

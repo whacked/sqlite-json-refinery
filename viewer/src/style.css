@@ -135,6 +135,7 @@ button:focus-visible {
   width: 1em;
 }
 
+/* extra data */
 .my-ag-table-extra-data-header {
   background: #92400e;
 }
@@ -142,6 +143,19 @@ button:focus-visible {
   border-color: #92400e;
   color: #92400e;
   border-width: 1px;
+  display: inline-flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+.my-ag-table-extra-data-cell button span {
+  display: flex;
+  padding: 0.5em;
+}
+.my-ag-table-extra-data-cell button span.key-size-indicator {
+  display: flex;
+  color: white;
+  background: #ef9259;
 }
 .my-ag-table-extra-data-expanded-column {
   background: #ef9259;
@@ -150,6 +164,7 @@ button:focus-visible {
   background: #fce8dc;
 }
 
+/* payload */
 .my-ag-table-payload-header {
   background: #0c4a6e;
 }
@@ -157,6 +172,18 @@ button:focus-visible {
   border-color: #0c4a6e;
   color: #0c4a6e;
   border-width: 1px;
+  display: inline-flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+.my-ag-table-payload-cell button span {
+  display: flex;
+  padding: 0.5em;
+}
+.my-ag-table-payload-cell button span.key-size-indicator {
+  color: white;
+  background: #4db1ec;
 }
 .my-ag-table-payload-expanded-column {
   background: #4db1ec;

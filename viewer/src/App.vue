@@ -1,7 +1,4 @@
 <template>
-  <div id="app">
-      <DataTable />
-  </div>
   <!-- hello world table
   <div class="myblock">
     <ag-grid-vue
@@ -14,11 +11,15 @@
   </div>
   -->
 
-
-
-
-
   <button @click="loadNewFile">Load JSONL File</button>
+  <DataTable
+    v-if="fileCache.length > 0"
+    :rowData="Array.from(fileCache.values())"
+   />
+   <DataTable
+    v-else
+    :rowData="[]"
+   />
   <ag-grid-vue
     v-if="fileCache.length > 0"
     class="ag-theme-alpine"
@@ -139,9 +140,6 @@ const columnDefs2 = ref<ColDef[]>([
       return filteredPayload;
     },
     headerClass: 'my-ag-table-derived-column',
-    cellStyle: {
-      'background-color': 'pistachio',
-    },
     cellRenderer: (params: CellRendererParams) => {
       const stringRepresentation = JSON.stringify(params.value);
       const numKeys = Object.keys(params.value).length;

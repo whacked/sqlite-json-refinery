@@ -1,7 +1,12 @@
 <template>
     <div>
         <button v-if="renderedPayload !== ''" @click="toggleExpand">
-            {{ renderedPayload }}
+            <span class="key-size-indicator">
+                {{ Object.keys(props.params.data.payload).length }}
+            </span>
+            <span class="rendered-content">
+                {{ renderedPayload }}
+            </span>
         </button>
     </div>
 </template>

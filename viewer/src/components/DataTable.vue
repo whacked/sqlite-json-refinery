@@ -45,11 +45,15 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, defineComponent, h, computed, Ref } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, paramValueToCss } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, paramValueToCss, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import PayloadCell from '@/components/PayloadCell.vue';
 import ExtractedDataCell from '@/components/ExtractedDataCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
+
+const props = defineProps<{
+  rowData: any[];
+}>();
 
 function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
   return defineComponent({
@@ -112,10 +116,10 @@ const rowData = ref<any[]>([]);
 
 namespace TableRowPositionStatus {
 
-export const totalRows = ref(0);
-export const visibleRows = ref(0);
-export const firstVisibleRow = ref(0);
-export const lastVisibleRow = ref(0);
+  export const totalRows = ref(0);
+  export const visibleRows = ref(0);
+  export const firstVisibleRow = ref(0);
+  export const lastVisibleRow = ref(0);
 }
 
 
@@ -166,11 +170,11 @@ const onGridReady = (params: GridReadyEvent) => {
 
 
 const fetchData = async () => {
-  const data = await dataStore.fetchData(0, dataStore.totalRows);
-  rowData.value = data.map(row => ({
+  const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
+  rowData.value = sourceData.map(row => ({
     ...row,
     payloadString: row.payload,
-    payload: JSON.parse(row.payload)
+    payload: row.payload ? JSON.parse(row.payload) : null,
   }));
   updateColumnDefs();
 };
@@ -212,8 +216,12 @@ const updateColumnDefs = () => {
   };
   const baseColumns: ColDef[] = (
     Array.from(ColumnManager.coreDisplayParams.value)
-    .filter(key => coreDisplayParamSettings[key])
-    .map(key => coreDisplayParamSettings[key])
+    .filter(key => key !== 'payload')  // this one is handled separately
+    .map(key => coreDisplayParamSettings[key] ?? {
+      field: key,
+      headerName: key,
+    })
+    .filter(colDef => colDef)
   );
 
   const payloadExtractedColumns: ColDef[] = Array.from(ColumnManager.expandedPayloadKeys.value)
@@ -245,6 +253,13 @@ const updateColumnDefs = () => {
     }));
 
   columnDefs.value = [
+    {
+      headerName: "#",
+      valueGetter: (params: ValueGetterParams) => {
+        return (params.node?.rowIndex ?? 0) + 1;
+      },
+      width: 80,
+    },
     ...baseColumns,
     ...extraDataExtractedColumns,
     { 
