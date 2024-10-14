@@ -248,6 +248,9 @@ const updateColumnDefs = () => {
       width: 150,
       headerClass: 'my-ag-table-extra-data-expanded-column',
       cellClass: 'my-ag-table-extra-data-expanded-cell',
+      cellRenderer: (params, _) => {
+        return params.data[key]?.toString()
+      },
       headerComponent: expandedExtraDataColumnHeader,
       headerComponentParams: {
         key: key,

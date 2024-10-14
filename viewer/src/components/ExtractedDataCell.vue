@@ -1,4 +1,4 @@
-<template>
+payloadRenderable.rendered<template>
     <div>
         <button v-if="extraData.rendered !== ''" @click="toggleExpand">
             <span class="key-size-indicator">
@@ -34,7 +34,6 @@ const extraData = computed(() => {
 });
 
 const toggleExpand = () => {
-    console.log("toggleExpand", props.params);
     if (props.params.node.rowIndex != null) {
         props.params.toggleExpandExtraDataKeys(props.params.node.rowIndex);
     }
