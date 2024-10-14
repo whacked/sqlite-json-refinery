@@ -21,7 +21,7 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
-        :paginationPageSize="paginationPageSize"
+        colon-paginationPageSize="paginationPageSize"
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
 
@@ -43,7 +43,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, defineComponent, h, computed, Ref } from 'vue';
+import { ref, onMounted, reactive, defineComponent, h, computed, Ref, toRaw } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
 import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, paramValueToCss, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
@@ -156,11 +156,12 @@ const defaultColDef = reactive({
   filter: true,
 });
 
-const rowBuffer = 0;
+const rowBuffer = 40;
 const rowModelType = 'clientSide';
+// const rowModelType = 'infinite';
 const paginationPageSize = 10;
-const cacheBlockSize = 10;
-const infiniteInitialRowCount = 1;
+const cacheBlockSize = 30;
+const infiniteInitialRowCount = 20;
 
 const onGridReady = (params: GridReadyEvent) => {
   gridApi.value = params.api;
@@ -238,6 +239,7 @@ const updateColumnDefs = () => {
       },
     }));
 
+  console.log("extractedDataExtractedKeys", toRaw(ColumnManager.extractedDataExtractedKeys.value));
   const extraDataExtractedColumns: ColDef[] = Array.from(ColumnManager.extractedDataExtractedKeys.value)
     .sort((a, b) => a.localeCompare(b))
     .map(key => ({
@@ -276,12 +278,12 @@ const updateColumnDefs = () => {
 
 };
 
-const toggleExpandPayloadKeys = (id: string) => {
-  if (ColumnManager.expandedPayloadRows.value.has(id)) {
-    ColumnManager.expandedPayloadRows.value.delete(id);
+const toggleExpandPayloadKeys = (rowIndex: number) => {
+  if (ColumnManager.expandedPayloadRows.value.has(rowIndex)) {
+    ColumnManager.expandedPayloadRows.value.delete(rowIndex);
   } else {
-    ColumnManager.expandedPayloadRows.value.add(id);
-    const row = rowData.value.find(r => r.id === id);
+    ColumnManager.expandedPayloadRows.value.add(rowIndex);
+    const row = rowData.value[rowIndex];
     if (row) {
       Object.keys(row.payload).forEach(key => ColumnManager.expandedPayloadKeys.value.add(key));
     }
@@ -289,12 +291,12 @@ const toggleExpandPayloadKeys = (id: string) => {
   updateColumnDefs();
 };
 
-const toggleContractPayloadKeys = (id: string) => {
-  if (!ColumnManager.expandedPayloadRows.value.has(id)) {
+const toggleContractPayloadKeys = (rowIndex: number) => {
+  if (!ColumnManager.expandedPayloadRows.value.has(rowIndex)) {
     return;
   } else {
-    ColumnManager.expandedPayloadRows.value.delete(id);
-    const row = rowData.value.find(r => r.id === id);
+    ColumnManager.expandedPayloadRows.value.delete(rowIndex);
+    const row = rowData.value[rowIndex];
     if (row) {
       Object.keys(row.payload).forEach(key => ColumnManager.expandedPayloadKeys.value.delete(key));
     }
@@ -302,27 +304,32 @@ const toggleContractPayloadKeys = (id: string) => {
   updateColumnDefs();
 }
 
-const toggleExpandExtraDataKeys = (id: string) => {
-  if (ColumnManager.extractedDataExpandedRows.value.has(id)) {
-    ColumnManager.extractedDataExpandedRows.value.delete(id);
+const toggleExpandExtraDataKeys = (rowIndex: number) => {
+  console.log("toggleExpandExtraDataKeys", rowIndex);
+  if (ColumnManager.extractedDataExpandedRows.value.has(rowIndex)) {
+    ColumnManager.extractedDataExpandedRows.value.delete(rowIndex);
   } else {
-    ColumnManager.extractedDataExpandedRows.value.add(id);
-    const row = rowData.value.find(r => r.id === id);
+    ColumnManager.extractedDataExpandedRows.value.add(rowIndex);
+    const row = rowData.value[rowIndex];
     if (row) {
+      console.log("row", row);
       Object.keys(row).filter(
         key => !ColumnManager.coreDisplayParams.value.has(key)
-      ).forEach(key => ColumnManager.extractedDataExtractedKeys.value.add(key));
+      ).forEach(key => {
+        console.log("adding key", key);
+        ColumnManager.extractedDataExtractedKeys.value.add(key)
+      });
     }
   }
   updateColumnDefs();
 }
 
-const toggleContractExtraDataKeys = (id: string) => {
-  if (!ColumnManager.extractedDataExpandedRows.value.has(id)) {
+const toggleContractExtraDataKeys = (rowIndex: number) => {
+  if (!ColumnManager.extractedDataExpandedRows.value.has(rowIndex)) {
     return;
   } else {
-    ColumnManager.extractedDataExpandedRows.value.delete(id);
-    const row = rowData.value.find(r => r.id === id);
+    ColumnManager.extractedDataExpandedRows.value.delete(rowIndex);
+    const row = rowData.value[rowIndex];
     if (row) {
       Object.keys(row).filter(
         key => !ColumnManager.coreDisplayParams.value.has(key)

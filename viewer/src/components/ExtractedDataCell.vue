@@ -17,7 +17,7 @@ import { RenderParams } from '@/utils/columnManager';
 import * as ColumnManager from '@/utils/columnManager';
 
 const props = defineProps<{
-    params: RenderParams
+    params: RenderParams;
 }>();
 
 const extraData = computed(() => {
@@ -33,5 +33,10 @@ const extraData = computed(() => {
     return { rendered, keyCount };
 });
 
-const toggleExpand = () => props.params.toggleExpandExtraDataKeys(props.params.data.id);
+const toggleExpand = () => {
+    console.log("toggleExpand", props.params);
+    if (props.params.node.rowIndex != null) {
+        props.params.toggleExpandExtraDataKeys(props.params.node.rowIndex);
+    }
+};
 </script>

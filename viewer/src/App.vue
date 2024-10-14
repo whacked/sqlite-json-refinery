@@ -177,9 +177,14 @@ interface RowFetchWindow {
 
 const dataSource2 = ref<IDatasource>({
   getRows: (params) => {
-    console.log('Fetching rows:', params.startRow, 'to', params.endRow);
+    console.log('Fetching rows:', params.startRow, 'to', params.endRow, "out of");
     fetchData2(params.startRow, params.endRow).then(rowData => {
-      params.successCallback(rowData.rows, rowData.totalRowCount);
+      console.log("got rows", rowData.rows, rowData.totalRowCount);
+      if(rowData.rows.length === 0) {
+        params.failCallback();
+      } else {
+        params.successCallback(rowData.rows, rowData.totalRowCount);
+      }
     });
   }
 });

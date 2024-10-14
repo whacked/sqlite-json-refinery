@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { IRowNode } from 'ag-grid-community';
 
 export const coreDisplayParams = ref(new Set<string>([
     // FIXME -- need more flexible setup
@@ -26,14 +27,15 @@ export const extractedDataExtractedKeys = ref(new Set<string>());
 
 
 export interface RenderParams {
+    node: IRowNode<any>;
     data?: any;
     coreDisplayParams: Set<string>;
     extraDataExtractedKeys: Set<string>;
     payloadExtractedKeys: Set<string>;
-    toggleExpandExtraDataKeys: (id: string) => void;
-    toggleContractExtraDataKeys: (id: string) => void;
-    toggleExpandPayloadKeys: (id: string) => void;
-    toggleContractPayloadKeys: (id: string) => void;
+    toggleExpandExtraDataKeys: (rowIndex: number) => void;
+    toggleContractExtraDataKeys: (rowIndex: number) => void;
+    toggleExpandPayloadKeys: (rowIndex: number) => void;
+    toggleContractPayloadKeys: (rowIndex: number) => void;
 }
 
 export function objectWithoutKeys<T>(obj: T, keySource: object | string[] | Set<string>): T {

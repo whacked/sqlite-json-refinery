@@ -1,11 +1,11 @@
 <template>
     <div>
-        <button v-if="renderedPayload !== ''" @click="toggleExpand">
+        <button v-if="payloadRenderable.rendered !== ''" @click="toggleExpand">
             <span class="key-size-indicator">
-                {{ Object.keys(props.params.data.payload).length }}
+                {{ payloadRenderable.keyCount }}
             </span>
             <span class="rendered-content">
-                {{ renderedPayload }}
+                {{ payloadRenderable.rendered }}
             </span>
         </button>
     </div>
@@ -17,36 +17,38 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { RenderParams } from '@/utils/columnManager';
-const hasKeys = computed(() => Object.keys(props.params.data.payload).length > 0);
+const hasKeys = computed(() => 
+  props.params?.data?.payload && Object.keys(props.params.data.payload).length > 0);
 
 const props = defineProps<{
-    params: RenderParams
+    params: RenderParams;
 }>();
 
-const renderedPayload = computed(() => renderParams(props.params.data.payload));
-
-function renderParams(payload: any) {
-    if (!hasKeys.value) return "";
+const payloadRenderable = computed(() => {
+    if (!hasKeys.value) return { rendered: "", keyCount: 0 };
     let numKeys = 0;
     const reducedPayload: Record<string, any> = {};
-    for (const key of Object.keys(payload)) {
+    for (const key of Object.keys(props.params.data.payload)) {
         if (props.params.payloadExtractedKeys.has(key)) {
             continue;
         }
-        reducedPayload[key] = payload[key];
+        reducedPayload[key] = props.params.data.payload[key];
         numKeys++;
     }
     if (numKeys == 0) {
-        return "";
+        return { rendered: "", keyCount: 0 };
     }
     const stringified = JSON.stringify(reducedPayload);
-    if (stringified.length <= 100) {
-        return stringified;
-    } else {
-        return stringified.substring(0, 100) + "...";
+    const rendered = stringified.length <= 100 ? stringified : stringified.substring(0, 100) + "...";
+    return {
+        rendered, keyCount: numKeys,
     }
-}
+})
 
-const toggleExpand = () => props.params.toggleExpandPayloadKeys(props.params.data.id);
+const toggleExpand = () => {
+    if (props.params.node.rowIndex != null) {
+        props.params.toggleExpandPayloadKeys(props.params.node.rowIndex);
+    }
+};
 
 </script>
