@@ -47,8 +47,8 @@ import { ref, onMounted, reactive, defineComponent, h, computed, Ref, toRaw } fr
 import { AgGridVue } from 'ag-grid-vue3';
 import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, paramValueToCss, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
-import PayloadCell from '@/components/PayloadCell.vue';
-import ExtractedDataCell from '@/components/ExtractedDataCell.vue';
+import ExpandableCell from '@/components/ExpandableCell.vue';
+import CollapsableCell from '@/components/CollapsableCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
 
 const props = defineProps<{
@@ -102,8 +102,8 @@ const expandedExtraDataColumnHeader = makeExpandedColumnHeader(ColumnManager.ext
 const components = {
   expandedPayloadColumnHeader,
   expandedExtraDataColumnHeader,
-  payloadCellRenderer: PayloadCell,
-  extractedDataCellRenderer: ExtractedDataCell,
+  payloadCellRenderer: ExpandableCell,
+  extractedDataCellRenderer: CollapsableCell,
 };
 
 const dataStore = useDataStore();
