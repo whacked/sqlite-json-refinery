@@ -1,6 +1,11 @@
 import { ref } from 'vue';
 import { IRowNode } from 'ag-grid-community';
 
+export const EXPANDABLE_DATA_COLUMN = 'payload';
+export const EXPANDABLE_DATA_COLUMN_SHADOW = 'payloadString';
+export const COLLAPSABLE_DATA_COLUMN = 'collapsedData';
+export const COLLAPSABLE_DATA_COLUMN_SHADOW = 'collapsedDataString';
+
 export const coreDisplayParams = ref(new Set<string>([
     // FIXME -- need more flexible setup
     // sample columns
@@ -8,34 +13,34 @@ export const coreDisplayParams = ref(new Set<string>([
     'country',
     'createdAt', */
 
-    'time',
     'topic',
+    'time',
     'category',
     'entry',
 
-    'payload',
+    EXPANDABLE_DATA_COLUMN,
     // derived columns
-    'payloadString',
-    'extraData',
-    'extraDataString',
+    EXPANDABLE_DATA_COLUMN_SHADOW,
+    COLLAPSABLE_DATA_COLUMN,
+    COLLAPSABLE_DATA_COLUMN_SHADOW,
 ]));
 
-export const expandedPayloadRows = ref(new Set<string>());
-export const expandedPayloadKeys = ref(new Set<string>());
-export const extractedDataExpandedRows = ref(new Set<string>());
-export const extractedDataExtractedKeys = ref(new Set<string>());
+export const expandedExpandableDataRows = ref(new Set<string>());
+export const expandedExpandableDataKeys = ref(new Set<string>());
+export const collapsableDataExpandedRows = ref(new Set<string>());
+export const collapsableDataExtractedKeys = ref(new Set<string>());
 
 
 export interface RenderParams {
-    node: IRowNode<any>;
+    node?: IRowNode<any>;
     data?: any;
     coreDisplayParams: Set<string>;
-    extraDataExtractedKeys: Set<string>;
-    payloadExtractedKeys: Set<string>;
-    toggleExpandExtraDataKeys: (rowIndex: number) => void;
-    toggleContractExtraDataKeys: (rowIndex: number) => void;
-    toggleExpandPayloadKeys: (rowIndex: number) => void;
-    toggleContractPayloadKeys: (rowIndex: number) => void;
+    collapsedDataKeys: Set<string>;
+    expandableDataExtractedKeys: Set<string>;
+    toggleExpandCollapsableDataKeys: (rowIndex: number) => void;
+    toggleContractCollapsableDataKeys: (rowIndex: number) => void;
+    toggleExpandExpandableKeys: (rowIndex: number) => void;
+    toggleContractExpandableKeys: (rowIndex: number) => void;
 }
 
 export function objectWithoutKeys<T>(obj: T, keySource: object | string[] | Set<string>): T {

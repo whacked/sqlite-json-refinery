@@ -127,7 +127,7 @@ const columnDefs2 = ref<ColDef[]>([
   { field: 'category' },
   { field: 'entry' },
   {
-    headerName: 'Extra Data',
+    headerName: 'Expandable Data',
     valueGetter: (params: ValueGetterParams) => {
       // return a canonicalized json string of the payload
       // whose keys are not included in the default key list

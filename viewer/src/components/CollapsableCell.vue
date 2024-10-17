@@ -1,11 +1,11 @@
 payloadRenderable.rendered<template>
     <div>
-        <button v-if="extraData.rendered !== ''" @click="toggleExpand">
+        <button v-if="collapsedData.rendered !== ''" @click="toggleExpand">
             <span class="key-size-indicator">
-                {{ extraData.keyCount }}
+                {{ collapsedData.keyCount }}
             </span>
             <span class="rendered-content">
-                {{ extraData.rendered }}
+                {{ collapsedData.rendered }}
             </span>
         </button>
     </div>
@@ -20,12 +20,12 @@ const props = defineProps<{
     params: RenderParams;
 }>();
 
-const extraData = computed(() => {
+const collapsedData = computed(() => {
     const subsetData = ColumnManager.objectWithoutKeys(
         props.params.data,
         new Set([
             ...ColumnManager.coreDisplayParams.value,
-            ...ColumnManager.extractedDataExtractedKeys.value
+            ...ColumnManager.collapsableDataExtractedKeys.value
         ])
     );
     const keyCount = Object.keys(subsetData).length;
@@ -35,7 +35,7 @@ const extraData = computed(() => {
 
 const toggleExpand = () => {
     if (props.params.node.rowIndex != null) {
-        props.params.toggleExpandExtraDataKeys(props.params.node.rowIndex);
+        props.params.toggleExpandCollapsableDataKeys(props.params.node.rowIndex);
     }
 };
 </script>

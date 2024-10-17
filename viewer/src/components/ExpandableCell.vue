@@ -29,7 +29,7 @@ const payloadRenderable = computed(() => {
     let numKeys = 0;
     const reducedPayload: Record<string, any> = {};
     for (const key of Object.keys(props.params.data.payload)) {
-        if (props.params.payloadExtractedKeys.has(key)) {
+        if (props.params.expandableDataExtractedKeys.has(key)) {
             continue;
         }
         reducedPayload[key] = props.params.data.payload[key];
@@ -47,7 +47,7 @@ const payloadRenderable = computed(() => {
 
 const toggleExpand = () => {
     if (props.params.node.rowIndex != null) {
-        props.params.toggleExpandPayloadKeys(props.params.node.rowIndex);
+        props.params.toggleExpandExpandableKeys(props.params.node.rowIndex);
     }
 };
 
