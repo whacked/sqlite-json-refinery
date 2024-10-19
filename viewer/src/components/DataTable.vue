@@ -7,7 +7,7 @@
     <div class="core-columns-control">
       <h4>Core Columns</h4>
       <div v-for="column in ColumnManager.availableColumns.value" :key="column.key" class="column-checkbox">
-        <label>
+        <label v-if="newColumnName == '' || column.key.includes(newColumnName)">
           <input 
             type="checkbox" 
             :checked="column.isEnabled" 
@@ -18,7 +18,9 @@
       </div>
       <div class="add-column">
         <input v-model="newColumnName" placeholder="New column name" />
-        <button @click="addCoreColumn">Add Column</button>
+        <button
+          v-if="newColumnName != '' && ColumnManager.availableColumns.value.filter(col => col.key == newColumnName).length > 0"
+          @click="addCoreColumn">Add Column {{ newColumnName }}</button>
       </div>
     </div>
     <div class="ag-theme-alpine" style="height: 500px; width: 100%;">
@@ -310,9 +312,12 @@ const updateColumnDefs = () => {
   const baseColumns: ColDef[] = (
     Array.from(ColumnManager.COMMON_COLUMN_KEYS.value)
     .filter(key => detectedKeys.value.has(key))
-    .concat(
-      [ColumnManager.COLLAPSABLE_DATA_COLUMN,]
-    )
+    .concat([
+      ColumnManager.COLLAPSABLE_DATA_COLUMN,
+      // needed for filtering
+      ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
+      ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
+    ])
     .map(key => coreDisplayParamSettings[key] ?? {
       field: key,
       headerName: key,
