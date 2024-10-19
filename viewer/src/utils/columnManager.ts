@@ -6,24 +6,38 @@ export const EXPANDABLE_DATA_COLUMN_SHADOW = 'payloadString';
 export const COLLAPSABLE_DATA_COLUMN = 'collapsedData';
 export const COLLAPSABLE_DATA_COLUMN_SHADOW = 'collapsedDataString';
 
-export const coreDisplayParams = ref(new Set<string>([
-    // FIXME -- need more flexible setup
-    // sample columns
-    /* 'id',
+export const COMMON_COLUMN_KEYS = ref(new Set<string>([
+    'id',
     'country',
-    'createdAt', */
+    'createdAt',
 
-    'topic',
     'time',
+    'topic',
     'category',
     'entry',
+]));
 
+export const SPECIAL_COLUMN_KEYS = new Set([
     EXPANDABLE_DATA_COLUMN,
     // derived columns
     EXPANDABLE_DATA_COLUMN_SHADOW,
     COLLAPSABLE_DATA_COLUMN,
     COLLAPSABLE_DATA_COLUMN_SHADOW,
-]));
+]);
+
+export interface DispalyableColumn {
+    key: string;
+    isEnabled: boolean;
+}
+export const availableColumns = ref<DispalyableColumn[]>(
+    ([] as DispalyableColumn[])
+        .concat(
+            Array.from(COMMON_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
+        )
+    /* .concat(
+        Array.from(SPECIAL_COLUMN_KEYS).map(key => ({ key, isEnabled: true }))
+    ) */
+);
 
 export const expandedExpandableDataRows = ref(new Set<number>());
 export const expandedExpandableDataKeys = ref(new Set<string>());

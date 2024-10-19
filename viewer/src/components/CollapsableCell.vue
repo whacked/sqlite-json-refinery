@@ -24,7 +24,8 @@ const collapsedData = computed(() => {
     const subsetData = ColumnManager.objectWithoutKeys(
         props.params.data,
         new Set([
-            ...ColumnManager.coreDisplayParams.value,
+            ...ColumnManager.COMMON_COLUMN_KEYS.value,
+            ...ColumnManager.SPECIAL_COLUMN_KEYS,
             ...ColumnManager.collapsableDataExtractedKeys.value
         ])
     );

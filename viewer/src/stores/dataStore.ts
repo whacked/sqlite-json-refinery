@@ -21,7 +21,7 @@ export const useDataStore = defineStore('data', () => {
       data.value = [...data.value, ...newData];
     }
 
-    console.log(`Fetching data from ${startRow} to ${endRow}:`, data.value.slice(startRow, endRow));
+    // console.log(`Fetching data from ${startRow} to ${endRow}:`, data.value.slice(startRow, endRow));
     return data.value.slice(startRow, endRow);
   }
 

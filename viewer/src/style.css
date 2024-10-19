@@ -243,3 +243,13 @@ button:focus-visible {
 .my-ag-table-expandable-data-expanded-cell {
   background: #d9eefb;
 }
+
+/* core columns */
+.column-checkbox {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.column-checkbox input[type="checkbox"] {
+  margin-right: 5px;
+}

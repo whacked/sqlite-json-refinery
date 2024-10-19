@@ -11,7 +11,7 @@
   </div>
   -->
 
-  <button @click="loadNewFile">Load JSONL File</button>
+  <button @click="loadFile">Load JSONL File</button>
   <DataTable
     v-if="fileCache.length > 0"
     :rowData="Array.from(fileCache.values())"
@@ -256,10 +256,5 @@ const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWin
     endIndex: endRow,
     totalRowCount: fileCache.value.length,
   };
-};
-
-
-const loadNewFile = async () => {
-  await loadFile();
 };
 </script>

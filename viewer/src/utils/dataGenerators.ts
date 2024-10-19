@@ -3,6 +3,16 @@ import { faker } from '@faker-js/faker';
 
 export function generateData(count: number) {
 
+  const fakeColumns: string[] = []
+
+  const NUM_FAKE_COLUMNS = 3;
+
+  for (let i = 0; i < NUM_FAKE_COLUMNS; ++i) {
+    fakeColumns.push(faker.lorem.word())
+  }
+
+  console.log("fakeColumns", fakeColumns);
+
   return Array.from({ length: count }, () => {
     const sharedShapeData = {
       id: faker.string.uuid(),
@@ -12,6 +22,7 @@ export function generateData(count: number) {
       // company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),
+      ...Object.fromEntries(fakeColumns.map(column => [column, faker.lorem.word()])),
     }
 
     const extraData: { [key: string]: any } = {}
@@ -21,7 +32,7 @@ export function generateData(count: number) {
         continue;
       }
       const columnName = `e-${i}`;
-      extraData[columnName] = faker.lorem.words()
+      extraData[columnName] = faker.lorem.word()
     }
 
     const extraNonPayloadData: { [key: string]: any } = {}
