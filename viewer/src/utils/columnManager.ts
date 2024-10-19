@@ -25,9 +25,9 @@ export const coreDisplayParams = ref(new Set<string>([
     COLLAPSABLE_DATA_COLUMN_SHADOW,
 ]));
 
-export const expandedExpandableDataRows = ref(new Set<string>());
+export const expandedExpandableDataRows = ref(new Set<number>());
 export const expandedExpandableDataKeys = ref(new Set<string>());
-export const collapsableDataExpandedRows = ref(new Set<string>());
+export const collapsableDataExpandedRows = ref(new Set<number>());
 export const collapsableDataExtractedKeys = ref(new Set<string>());
 
 
@@ -37,8 +37,8 @@ export interface RenderParams {
     coreDisplayParams: Set<string>;
     collapsedDataKeys: Set<string>;
     expandableDataExtractedKeys: Set<string>;
-    toggleExpandCollapsableDataKeys: (rowIndex: number) => void;
-    toggleContractCollapsableDataKeys: (rowIndex: number) => void;
+    toggleExpandCollapsibleKeys: (rowIndex: number) => void;
+    toggleContractCollapsibleKeys: (rowIndex: number) => void;
     toggleExpandExpandableKeys: (rowIndex: number) => void;
     toggleContractExpandableKeys: (rowIndex: number) => void;
 }

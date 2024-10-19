@@ -135,11 +135,37 @@ button:focus-visible {
   width: 1em;
 }
 
-/* extra data */
-.my-ag-table-extra-data-header {
+/* collapsible data */
+.my-ag-table-collapsible-data-header {
   background: #92400e;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
-.my-ag-table-extra-data-cell button {
+.my-ag-table-collapsible-data-header > div {
+  display: flex;
+  flex: 1;
+}
+.my-ag-table-collapsible-data-header .ag-header-cell-text {
+  overflow: hidden;
+}
+.my-ag-table-collapsible-data-header > .button-container > div {
+  width: 100%;
+  text-align: right;
+}
+.my-ag-table-collapsible-data-header button {
+  padding: 0;
+  width: 2em;
+  line-height: 2em;
+  margin-left: 0.5em;
+  background: brown;
+  border: 2px solid #ccc;
+  color: #ccc;
+}
+
+.my-ag-table-collapsible-data-cell button {
   border-color: #92400e;
   color: #92400e;
   border-width: 1px;
@@ -148,27 +174,53 @@ button:focus-visible {
   padding: 0;
   overflow: hidden;
 }
-.my-ag-table-extra-data-cell button span {
+.my-ag-table-collapsible-data-cell button span {
   display: flex;
   padding: 0.5em;
 }
-.my-ag-table-extra-data-cell button span.key-size-indicator {
+.my-ag-table-collapsible-data-cell button span.key-size-indicator {
   display: flex;
   color: white;
   background: #ef9259;
 }
-.my-ag-table-extra-data-expanded-column {
+.my-ag-table-collapsible-data-expanded-column {
   background: #ef9259;
 }
-.my-ag-table-extra-data-expanded-cell {
+.my-ag-table-collapsible-data-expanded-cell {
   background: #fce8dc;
 }
 
-/* payload */
-.my-ag-table-payload-header {
+/* expandable data */
+.my-ag-table-expandable-data-header {
   background: #0c4a6e;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
-.my-ag-table-payload-cell button {
+.my-ag-table-expandable-data-header > div {
+  display: flex;
+  flex: 1;
+}
+.my-ag-table-expandable-data-header .ag-header-cell-text {
+  overflow: hidden;
+}
+.my-ag-table-expandable-data-header > .button-container > div {
+  width: 100%;
+  text-align: right;
+}
+.my-ag-table-expandable-data-header button {
+  padding: 0;
+  width: 2em;
+  line-height: 2em;
+  margin-left: 0.5em;
+  background: blue;
+  border: 2px solid #ccc;
+  color: #ccc;
+}
+
+.my-ag-table-expandable-data-cell button {
   border-color: #0c4a6e;
   color: #0c4a6e;
   border-width: 1px;
@@ -177,17 +229,17 @@ button:focus-visible {
   padding: 0;
   overflow: hidden;
 }
-.my-ag-table-payload-cell button span {
+.my-ag-table-expandable-data-cell button span {
   display: flex;
   padding: 0.5em;
 }
-.my-ag-table-payload-cell button span.key-size-indicator {
+.my-ag-table-expandable-data-cell button span.key-size-indicator {
   color: white;
   background: #4db1ec;
 }
-.my-ag-table-payload-expanded-column {
+.my-ag-table-expandable-data-expanded-column {
   background: #4db1ec;
 }
-.my-ag-table-payload-expanded-cell {
+.my-ag-table-expandable-data-expanded-cell {
   background: #d9eefb;
 }

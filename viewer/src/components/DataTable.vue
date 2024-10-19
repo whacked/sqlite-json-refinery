@@ -2,8 +2,7 @@
   <div>
     <div class="filters">
       <input v-model="quickFilterText" placeholder="Quick filter..." @input="onQuickFilterChanged" />
-      <button @click="expandAllExpandableRows">Expand All</button>
-      <button @click="contractAllExpandableRows">Contract All</button>
+      <button @click="autoSizeColumns">Fit Columns</button>
     </div>
     <div class="ag-theme-alpine" style="height: 500px; width: 100%;">
       <div>
@@ -21,7 +20,9 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
+
         colon-paginationPageSize="paginationPageSize"
+
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
 
@@ -169,6 +170,9 @@ const onGridReady = (params: GridReadyEvent) => {
   updateRowCount();
 };
 
+const autoSizeColumns = () => {
+  gridApi.value?.autoSizeColumns(Array.from(ColumnManager.coreDisplayParams.value));
+}
 
 const fetchData = async () => {
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
@@ -185,10 +189,10 @@ const updateColumnDefs = () => {
     coreDisplayParams: ColumnManager.coreDisplayParams.value,
     expandableDataExtractedKeys: ColumnManager.expandedExpandableDataKeys.value,
     collapsedDataKeys: ColumnManager.collapsableDataExtractedKeys.value,
-    toggleExpandCollapsableDataKeys: toggleExpandCollapsibleKeys,
-    toggleContractCollapsableDataKeys: toggleContractCollapsibleKeys,
-    toggleExpandExpandableKeys: toggleExpandPayloadKeys,
-    toggleContractExpandableKeys: toggleContractPayloadKeys,
+    toggleExpandCollapsibleKeys,
+    toggleContractCollapsibleKeys,
+    toggleExpandExpandableKeys,
+    toggleContractExpandableKeys,
   };
 
   const coreDisplayParamSettings: Record<string, ColDef> = {
@@ -197,17 +201,44 @@ const updateColumnDefs = () => {
     createdAt: { field: 'createdAt', headerName: 'Created At', width: 200 },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: {
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
-      headerName: 'Extra Data String (not shown; for filtering)',
+      headerName: 'collapsed data String (not shown; for filtering)',
       hide: true,
     },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
-      headerName: 'Extra Data',
+      headerName: 'Collapsed Data',
       width: 200,
-      headerClass: 'my-ag-table-extra-data-header',
+      headerClass: 'my-ag-table-collapsible-data-header',
       cellRenderer: 'extractedDataCellRenderer',
-      cellClass: 'my-ag-table-extra-data-cell',
+      cellClass: 'my-ag-table-collapsible-data-cell',
       cellRendererParams: cellRendererParams,
+      headerComponent: defineComponent({
+        props: ['displayName', 'onCustomAction'],
+        setup(props) {
+          //@ts-ignore  this is correct, but flagged by the linter
+          const params = props.params;
+
+          return () => h('div', { class: 'my-ag-table-collapsible-data-header' }, [
+            h('div', {}, [
+              h('div', { class: 'ag-header-cell-text' }, params.displayName),
+            ]),
+            h('div', { class: 'button-container' }, [
+              h('div', {}, [
+                h('button', {
+                  class: 'ag-my collapse all',
+                  title: 'Collapse all',
+                  onClick: collapseAllCollapsibleRows
+                }, '◀'),
+                h('button', {
+                  class: 'ag-my expand all',
+                  title: 'Expand all',
+                  onClick: restoreAllCollapsedRows
+                }, '▶'),
+              ]),
+            ]),
+          ]);
+        }
+      }),
     },
     [ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW]: { 
       field: ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
@@ -232,8 +263,8 @@ const updateColumnDefs = () => {
       field: key,
       headerName: `${key}`,
       width: 150,
-      headerClass: 'my-ag-table-extra-data-expanded-column',
-      cellClass: 'my-ag-table-extra-data-expanded-cell',
+      headerClass: 'my-ag-table-collapsible-data-expanded-column',
+      cellClass: 'my-ag-table-collapsible-data-expanded-cell',
       cellRenderer: (params: ColumnManager.RenderParams, _: any) => {
         return params.data[key]?.toString()
       },
@@ -249,8 +280,8 @@ const updateColumnDefs = () => {
       field: `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`,
       headerName: key,
       width: 150,
-      headerClass: 'my-ag-table-payload-expanded-column',
-      cellClass: 'my-ag-table-payload-expanded-cell',
+      headerClass: 'my-ag-table-expandable-data-expanded-column',
+      cellClass: 'my-ag-table-expandable-data-expanded-cell',
       headerComponent: expandedPayloadColumnHeader,
        headerComponentParams: {
         key: key,
@@ -270,19 +301,46 @@ const updateColumnDefs = () => {
     ...collapsedDataExtractedColumns,
     { 
       field: ColumnManager.EXPANDABLE_DATA_COLUMN, 
-      headerName: 'Payload (expandable)', 
+      headerName: 'Expandable Data', 
       width: 300, 
       cellRenderer: 'payloadCellRenderer',
-      headerClass: 'my-ag-table-payload-header',
-      cellClass: 'my-ag-table-payload-cell',
+      headerClass: 'my-ag-table-expandable-data-header',
+      cellClass: 'my-ag-table-expandable-data-cell',
       cellRendererParams: cellRendererParams,
+      headerComponent: defineComponent({
+        props: ['displayName', 'onCustomAction'],
+        setup(props) {
+          //@ts-ignore  this is correct, but flagged by the linter
+          const params = props.params;
+
+          return () => h('div', { class: 'my-ag-table-expandable-data-header' }, [
+            h('div', {}, [
+              h('div', { class: 'ag-header-cell-text' }, params.displayName),
+            ]),
+            h('div', { class: 'button-container' }, [
+              h('div', {}, [
+                h('button', {
+                  class: 'ag-my collapse all',
+                  title: 'Collapse all',
+                  onClick: contractAllExpandableRows
+                }, '◀'),
+                h('button', {
+                  class: 'ag-my expand all',
+                  title: 'Expand all',
+                  onClick: expandAllExpandableRows
+                }, '▶'),
+              ]),
+            ]),
+          ]);
+        }
+      }),
     },
     ...expandableDataExtractedColumns,
   ];
 
 };
 
-const toggleExpandPayloadKeys = (rowIndex: number) => {
+const toggleExpandExpandableKeys = (rowIndex: number) => {
   if (ColumnManager.expandedExpandableDataRows.value.has(rowIndex)) {
     ColumnManager.expandedExpandableDataRows.value.delete(rowIndex);
   } else {
@@ -295,7 +353,7 @@ const toggleExpandPayloadKeys = (rowIndex: number) => {
   updateColumnDefs();
 };
 
-const toggleContractPayloadKeys = (rowIndex: number) => {
+const toggleContractExpandableKeys = (rowIndex: number) => {
   if (!ColumnManager.expandedExpandableDataRows.value.has(rowIndex)) {
     return;
   } else {
@@ -343,6 +401,21 @@ const toggleContractCollapsibleKeys = (rowIndex: number) => {
   updateColumnDefs();
 }
 
+const restoreAllCollapsedRows = () => {
+  rowData.value.forEach(row => {
+    ColumnManager.collapsableDataExpandedRows.value.add(row.id);
+    Object.keys(row).forEach(key => ColumnManager.collapsableDataExtractedKeys.value.add(key));
+  });
+  updateColumnDefs();
+};
+
+const collapseAllCollapsibleRows = () => {
+  ColumnManager.collapsableDataExpandedRows.value.clear();
+  ColumnManager.collapsableDataExtractedKeys.value.clear();
+  updateColumnDefs();
+};
+
+
 const expandAllExpandableRows = () => {
   rowData.value.forEach(row => {
     ColumnManager.expandedExpandableDataRows.value.add(row.id);
@@ -352,6 +425,7 @@ const expandAllExpandableRows = () => {
 };
 
 const contractAllExpandableRows = () => {
+  ColumnManager.expandedExpandableDataKeys.value.clear();
   ColumnManager.expandedExpandableDataRows.value.clear();
   updateColumnDefs();
 };

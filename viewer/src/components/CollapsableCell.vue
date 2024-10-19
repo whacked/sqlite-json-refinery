@@ -1,6 +1,6 @@
 payloadRenderable.rendered<template>
     <div>
-        <button v-if="collapsedData.rendered !== ''" @click="toggleExpand">
+        <button v-if="collapsedData.rendered !== ''" @click="toggleExpandCollapsableDataKeys">
             <span class="key-size-indicator">
                 {{ collapsedData.keyCount }}
             </span>
@@ -33,9 +33,9 @@ const collapsedData = computed(() => {
     return { rendered, keyCount };
 });
 
-const toggleExpand = () => {
-    if (props.params.node.rowIndex != null) {
-        props.params.toggleExpandCollapsableDataKeys(props.params.node.rowIndex);
+const toggleExpandCollapsableDataKeys = () => {
+    if (props.params.node?.rowIndex != null) {
+        props.params.toggleExpandCollapsibleKeys(props.params.node.rowIndex);
     }
 };
 </script>
