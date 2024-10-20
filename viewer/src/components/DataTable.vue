@@ -1,12 +1,15 @@
 <template>
-  <div>
+  <div class="main-grid-container">
     <div class="filters">
       <input v-model="quickFilterText" placeholder="Quick filter..." @input="onQuickFilterChanged" />
       <button @click="autoSizeColumns">Fit Columns</button>
     </div>
     <div class="core-columns-control">
       <h4>Core Columns</h4>
-      <div v-for="column in ColumnManager.availableColumns.value" :key="column.key" class="column-checkbox">
+      <div
+        v-for="column in ColumnManager.availableColumns.value.sort((a, b) => a.key.localeCompare(b.key))"
+        :key="column.key" class="column-checkbox"
+      >
         <label v-if="newColumnName == '' || column.key.includes(newColumnName)">
           <input 
             type="checkbox" 
@@ -23,15 +26,14 @@
           @click="addCoreColumn">Add Column {{ newColumnName }}</button>
       </div>
     </div>
-    <div class="ag-theme-alpine" style="height: 500px; width: 100%;">
+    <div class="ag-theme-alpine">
       <div>
         {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${dataStore.totalRows} rows visible
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
         }}; {{ totalExpandableRows }} expandable rows
       </div>
       <ag-grid-vue
-        style="height: 100%; border: 4px dashed orange;"
-        class="ag-theme-quartz"
+        class="ag-theme-quartz main-grid"
         :columnDefs="columnDefs"
         :rowData="rowData"
         :defaultColDef="defaultColDef"
@@ -39,6 +41,7 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
+        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || ColumnManager.collapsableDataExtractedKeys.value.has('photo') ? 200 : null"
 
         colon-paginationPageSize="paginationPageSize"
 
@@ -58,6 +61,22 @@
 </template>
 
 <style scoped>
+
+.main-grid-container {
+  width: 100%;
+  height: 80em;
+  background: beige;
+}
+
+.ag-theme-alpine {
+  height: 60em;
+}
+
+.main-grid {
+  background: orange;
+  height: 100%;
+}
+
 .filters {
   margin-bottom: 10px;
 }
@@ -71,6 +90,7 @@ import { BodyScrollEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent, param
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
+import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
 
 const props = defineProps<{
@@ -127,6 +147,7 @@ const components = {
   expandedExtraDataColumnHeader: expandedCollapsibleDataColumnHeader,
   payloadCellRenderer: ExpandableCell,
   extractedDataCellRenderer: CollapsableCell,
+  photoCellRenderer: PhotoCell,
 };
 
 const dataStore = useDataStore();
@@ -156,7 +177,7 @@ const onKeyDown = (event: KeyboardEvent) => {
     const rowIndex = cursorPosition?.rowIndex;
     const colIndex = cursorPosition?.column.getColId();
     if (rowIndex != null && colIndex != null) {
-      navigator.clipboard.writeText(rowData.value[rowIndex][colIndex]);
+      navigator.clipboard.writeText(rowData.value[rowIndex][colIndex] ?? JSON.stringify(rowData.value[rowIndex]));
     }
   }
 }
@@ -252,6 +273,7 @@ const fetchData = async () => {
     }
     return {
       ...row,
+      [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: JSON.stringify(ColumnManager.objectWithoutKeys(row, ColumnManager.SPECIAL_COLUMN_KEYS)),
       [ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW]: row[ColumnManager.EXPANDABLE_DATA_COLUMN],
       [ColumnManager.EXPANDABLE_DATA_COLUMN]: row[ColumnManager.EXPANDABLE_DATA_COLUMN] ? JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]) : null,
     }
@@ -274,6 +296,12 @@ const updateColumnDefs = () => {
     id: { field: 'id', headerName: 'ID', width: 100 },
     country: { field: 'country', headerName: 'Country', width: 150 },
     createdAt: { field: 'createdAt', headerName: 'Created At', width: 200 },
+    photo: {
+      field: 'photo',
+      headerName: 'Photo',
+      width: 100,
+      cellRenderer: 'photoCellRenderer',
+    },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: {
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
       headerName: 'collapsed data String (not shown; for filtering)',
@@ -446,7 +474,7 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
 }
 
 const toggleExpandCollapsibleKeys = (rowIndex: number) => {
-  console.log("toggleExpandExtraDataKeys", rowIndex);
+  console.log("!!!toggleExpandExtraDataKeys", rowIndex);
   if (ColumnManager.collapsableDataExpandedRows.value.has(rowIndex)) {
     ColumnManager.collapsableDataExpandedRows.value.delete(rowIndex);
   } else {
@@ -455,7 +483,7 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
     if (row) {
       console.log("row", row);
       Object.keys(row).filter(
-        key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key)
+        key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
       ).forEach(key => {
         console.log("adding key", key);
         ColumnManager.collapsableDataExtractedKeys.value.add(key)
@@ -473,10 +501,7 @@ const toggleContractCollapsibleKeys = (rowIndex: number) => {
     const row = rowData.value[rowIndex];
     if (row) {
       Object.keys(row).filter(
-        key => (
-          !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) &&
-          !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
-        )
+        key => (!ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key))
       ).forEach(key => ColumnManager.collapsableDataExtractedKeys.value.delete(key));
     }
   }
@@ -487,10 +512,7 @@ const restoreAllCollapsedRows = () => {
   rowData.value.forEach(row => {
     ColumnManager.collapsableDataExpandedRows.value.add(row.id);
     Object.keys(row).filter(
-      key => (
-        !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) &&
-        !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
-      )
+      key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
     ).forEach(key => ColumnManager.collapsableDataExtractedKeys.value.add(key));
   });
   updateColumnDefs();
@@ -527,12 +549,35 @@ const contractAllExpandableRows = () => {
 };
 
 const onQuickFilterChanged = () => {
-  console.log(quickFilterText.value.trim());
-  gridApi.value?.setColumnFilterModel(ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW, {
+  const filterText = quickFilterText.value.trim();
+  console.log("filterText", filterText);
+  // apply filter to the COLLAPSABLE_DATA_COLUMN_SHADOW
+  gridApi.value?.setColumnFilterModel(ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW, {
     filterType: 'text',
     type: 'contains',
-    filter: quickFilterText.value.trim(),
+    filter: filterText,
   });
+
+  // DEBUG: display the first 5 rows's data in the COLLAPSABLE_DATA_COLUMN_SHADOW
+  console.log("first 5 rows's data in the COLLAPSABLE_DATA_COLUMN_SHADOW", rowData.value.slice(0, 5).map(row => row[ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]));
+  console.log("First 5 rows full data", rowData.value.slice(0, 5));
+
+  /* if (filterText.length === 0) {
+    gridApi.value?.setFilterModel({});
+  } else {
+    gridApi.value?.setFilterModel({
+      ...({[ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW]: {
+        filterType: 'text',
+        type: 'contains',
+        filter: quickFilterText.value.trim(),
+      }} ?? {}),
+      ...({[ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: {
+        filterType: 'text',
+        type: 'contains',
+        filter: quickFilterText.value.trim(),
+      }} ?? {}),
+    });
+    } */
   gridApi.value?.onFilterChanged();
 };
 

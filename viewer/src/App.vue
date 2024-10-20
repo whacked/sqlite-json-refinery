@@ -20,8 +20,12 @@
     v-else
     :rowData="[]"
    />
+  <label v-if="fileCache.length > 0">
+    <input type="checkbox" v-model="showTestTable" />
+    Show Test Table
+  </label>
   <ag-grid-vue
-    v-if="fileCache.length > 0"
+    v-if="showTestTable && fileCache.length > 0"
     class="ag-theme-alpine"
     style="height: 500px; width: 100%;"
     :columnDefs="columnDefs2"
@@ -205,6 +209,7 @@ async function getFileHandle() {
 }
 
 const fileCache = ref<any[]>([]);
+const showTestTable = ref<boolean>(false);
 
 async function loadFile() {
   const fileHandle = await getFileHandle();
