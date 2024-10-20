@@ -45,6 +45,8 @@
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
 
+        @keydown="onKeyDown"
+
         @grid-ready="onGridReady"
         @model-updated="onModelUpdated"
         @first-data-rendered="onFirstDataRendered"
@@ -146,6 +148,17 @@ namespace TableRowPositionStatus {
 
 const onBodyScroll = (event: BodyScrollEvent) => {
   updateRowCount();
+}
+
+const onKeyDown = (event: KeyboardEvent) => {
+  if (event.ctrlKey && event.key === 'c') {
+    const cursorPosition = gridApi.value?.getFocusedCell();
+    const rowIndex = cursorPosition?.rowIndex;
+    const colIndex = cursorPosition?.column.getColId();
+    if (rowIndex != null && colIndex != null) {
+      navigator.clipboard.writeText(rowData.value[rowIndex][colIndex]);
+    }
+  }
 }
 
 const currentDisplayedRowsRange = ref('');
