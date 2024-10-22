@@ -58,6 +58,10 @@ export interface RenderParams {
 }
 
 export function objectWithoutKeys<T>(obj: T, keySource: object | string[] | Set<string>): T {
+    if (!obj) {
+        return {} as T;
+    }
+
     let excluder: (key: string) => boolean;
     if (keySource instanceof Set) {
         excluder = (key: string) => !keySource.has(key);
@@ -68,7 +72,7 @@ export function objectWithoutKeys<T>(obj: T, keySource: object | string[] | Set<
         const keySet = new Set(Object.keys(keySource));
         excluder = (key: string) => !keySet.has(key);
     }
-    return Object.fromEntries(Object.entries(obj as object).filter(([key]) => excluder(key))) as T;
+    return (Object.fromEntries(Object.entries(obj as object).filter(([key]) => excluder(key))) ?? {}) as T;
 }
 
 export function objectWithKeys<T>(obj: T, keySource: object | string[] | Set<string>): T {
