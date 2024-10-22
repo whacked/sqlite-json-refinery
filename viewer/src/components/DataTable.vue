@@ -92,6 +92,7 @@ import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
 import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
+import ColorHash from 'color-hash';
 
 const props = defineProps<{
   rowData: any[];
@@ -121,8 +122,17 @@ function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
         sortOrder.value = params.column.getSort();
       });
 
-      return () => h('div', { class: 'ag-header-cell-label' }, [
-        h('span', { class: 'ag-header-cell-text' }, params.displayName),
+      return () => h('div', {
+        class: 'ag-header-cell-label my-ag-table-expanded-column-header',
+      }, [
+        ...(
+          params.displayName.split('.').map((word: string, index: number) => {
+            return h('span', {
+              class: 'ag-header-cell-text',
+              style: { background: colorHash.hex(word) },
+            }, index > 0 ? '.' + word : word)
+          })
+        ),
         h('button', {
           class: 'ag-my-sort-button',
           onClick: onSortClicked

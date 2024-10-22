@@ -11,11 +11,13 @@
   "dependencies": {
     "ag-grid-community": "^32.2.2",
     "ag-grid-vue3": "^32.2.2",
+    "color-hash": "^2.0.2",
     "pinia": "^2.2.4",
     "vue": "^3.5.11"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.0.3",
+    "@types/color-hash": "^2.0.0",
     "@vitejs/plugin-vue": "^5.1.4",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
