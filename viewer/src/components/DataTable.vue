@@ -175,12 +175,21 @@ const onKeyDown = (event: KeyboardEvent) => {
   if (event.ctrlKey && event.key === 'c') {
     const cursorPosition = gridApi.value?.getFocusedCell();
     const rowIndex = cursorPosition?.rowIndex;
-    const colIndex = cursorPosition?.column.getColId();
-    if (rowIndex != null && colIndex != null) {
-      navigator.clipboard.writeText(rowData.value[rowIndex][colIndex] ?? JSON.stringify(rowData.value[rowIndex]));
+    const colId = cursorPosition?.column.getColId();
+
+    if (rowIndex != null && colId != null) {
+      // Get the displayed row corresponding to the focused cell
+      const displayedRow = gridApi.value?.getDisplayedRowAtIndex(rowIndex);
+
+      if (displayedRow) {
+        // Retrieve the cell value from the displayed row
+        const cellValue = displayedRow.data[colId] ?? JSON.stringify(displayedRow.data);
+        navigator.clipboard.writeText(cellValue);
+      }
     }
   }
 }
+
 
 const currentDisplayedRowsRange = ref('');
 
