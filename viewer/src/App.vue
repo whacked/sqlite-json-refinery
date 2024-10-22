@@ -12,6 +12,7 @@
   -->
 
   <button @click="loadFile">Load JSONL File</button>
+  <button @click="exampleLoadRemoteData">Load Remote Data</button>
   <DataTable
     v-if="fileCache.length > 0"
     :rowData="Array.from(fileCache.values())"
@@ -85,6 +86,7 @@ const colDefs = ref([
 
 import { ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
 import { faker } from '@faker-js/faker';
+import { loadRemoteData } from './stores/remoteDataLoader';
 
 
 // TODO move this to autogen
@@ -262,4 +264,9 @@ const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWin
     totalRowCount: fileCache.value.length,
   };
 };
+
+const exampleLoadRemoteData = async () => {
+  const data = await loadRemoteData(1000, 1000);
+  fileCache.value = data.rows;
+}
 </script>

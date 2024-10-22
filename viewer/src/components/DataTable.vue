@@ -5,26 +5,28 @@
       <button @click="autoSizeColumns">Fit Columns</button>
     </div>
     <div class="core-columns-control">
-      <h4>Core Columns</h4>
-      <div
-        v-for="column in ColumnManager.availableColumns.value.sort((a, b) => a.key.localeCompare(b.key))"
-        :key="column.key" class="column-checkbox"
-      >
-        <label v-if="newColumnName == '' || column.key.includes(newColumnName)">
-          <input 
-            type="checkbox" 
-            :checked="column.isEnabled" 
-            @change="toggleCoreColumn(column.key)"
-          />
-          {{ column.key }}
-        </label>
-      </div>
-      <div class="add-column">
-        <input v-model="newColumnName" placeholder="New column name" />
-        <button
-          v-if="newColumnName != '' && ColumnManager.availableColumns.value.filter(col => col.key == newColumnName).length > 0"
-          @click="addCoreColumn">Add Column {{ newColumnName }}</button>
-      </div>
+      <details>
+        <summary>Core Columns</summary>
+        <div class="add-column">
+          <input v-model="newColumnName" placeholder="New column name" />
+          <button
+            v-if="newColumnName != '' && ColumnManager.availableColumns.value.filter(col => col.key == newColumnName).length > 0"
+            @click="addCoreColumn">Add Column {{ newColumnName }}</button>
+        </div>
+        <div
+          v-for="column in ColumnManager.availableColumns.value.sort((a, b) => a.key.localeCompare(b.key))"
+          :key="column.key" class="column-checkbox"
+        >
+          <label v-if="newColumnName == '' || column.key.includes(newColumnName)">
+            <input 
+              type="checkbox" 
+              :checked="column.isEnabled" 
+              @change="toggleCoreColumn(column.key)"
+            />
+            {{ column.key }}
+          </label>
+        </div>
+      </details>
     </div>
     <div class="ag-theme-alpine">
       <div>
@@ -32,7 +34,33 @@
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
         }}; {{ totalExpandableRows }} expandable rows
       </div>
+      <h3>
+        {{ props.rowData.length }} rows passed in
+      </h3>
       <ag-grid-vue
+        v-if="props.rowData.length == 0"
+
+        class="ag-theme-quartz main-grid"
+        :columnDefs="columnDefs"
+        :defaultColDef="defaultColDef"
+        :components="components"
+        rowModelType="infinite"
+        :datasource="dataSource"
+        :cacheBlockSize="cacheBlockSize"
+        :infiniteInitialRowCount="infiniteInitialRowCount"
+        :maxBlocksInCache="maxBlocksInCache"
+        :rowBuffer="rowBuffer"
+        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || ColumnManager.collapsableDataExtractedKeys.value.has('photo') ? 200 : null"
+        @grid-ready="onGridReady"
+        @model-updated="onModelUpdated"
+        @first-data-rendered="onFirstDataRendered"
+        @body-scroll="onBodyScroll"
+      >
+      </ag-grid-vue>
+
+      <ag-grid-vue
+        v-if="props.rowData.length > 0"
+
         class="ag-theme-quartz main-grid"
         :columnDefs="columnDefs"
         :rowData="rowData"
@@ -77,6 +105,10 @@
   height: 100%;
 }
 
+.add-column {
+  display: inline-block;
+}
+
 .filters {
   margin-bottom: 10px;
 }
@@ -86,13 +118,17 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, defineComponent, h, computed, Ref, toRaw } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { BodyScrollEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent, paramValueToCss, ValueGetterParams } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GetRowIdParams, GridApi, GridReadyEvent, IDatasource, paramValueToCss, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
 import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
 import ColorHash from 'color-hash';
+import { loadRemoteData } from '@/stores/remoteDataLoader';
+
+const colorHash = new ColorHash();
+
 
 const props = defineProps<{
   rowData: any[];
@@ -167,6 +203,7 @@ const quickFilterText = ref('');
 const gridApi = ref<GridApi | null>(null);
 const rowData = ref<any[]>([]);
 
+const maxBlocksInCache = ref(100);
 
 namespace TableRowPositionStatus {
 
@@ -274,6 +311,10 @@ const onGridReady = (params: GridReadyEvent) => {
   gridApi.value = params.api;
   fetchData();
   updateRowCount();
+
+  //params.api //.setDatasource(dataSource);
+  console.log("gridApi", params.api)
+
 };
 
 const autoSizeColumns = () => {
@@ -284,8 +325,10 @@ const autoSizeColumns = () => {
 const totalExpandableRows = ref<number>(0)
 const detectedKeys = ref(new Set<string>());
 const fetchData = async () => {
+  detectedKeys.value.clear();
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
   rowData.value = sourceData.map(row => {
+    // console.log("GET RAW ROW", row)
     Object.keys(row).forEach(key => detectedKeys.value.add(key));
     if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
       totalExpandableRows.value++;
@@ -604,4 +647,38 @@ onMounted(() => {
   fetchData();
 });
 
+
+
+const dataSource: IDatasource = {
+  getRows: async (params) => {
+    const { startRow, endRow, successCallback, failCallback } = params;
+    
+    detectedKeys.value.clear();
+    
+    try {
+      const limit = endRow - startRow;
+      const result = await loadRemoteData(startRow, limit);
+      
+      // Assuming loadRemoteData returns an object with data and totalCount
+      const { rows, totalRowCount } = result;
+
+      // preprocess for ag-grid;
+      // something weird with json string escaping
+      // when triggered manually no problem;
+      // when used as infinite datasource, it has problem
+      for (const row of rows) {
+        row.payload = JSON.parse(row.payload);
+        Object.keys(row.payload).forEach(key => detectedKeys.value.add(key));
+      }
+      
+      // If this is the last block of data, pass the actual row count
+      const lastRow = startRow + rows.length >= totalRowCount ? totalRowCount : undefined;
+      
+      successCallback(rows, lastRow);
+    } catch (error) {
+      console.error('Error fetching remote data:', error);
+      failCallback();
+    }
+  }
+};
 </script>

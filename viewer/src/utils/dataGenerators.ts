@@ -8,7 +8,16 @@ export function generateData(count: number) {
   const NUM_FAKE_COLUMNS = 3;
 
   for (let i = 0; i < NUM_FAKE_COLUMNS; ++i) {
-    fakeColumns.push(faker.lorem.word())
+    const fakeColumn = faker.lorem.word()
+    fakeColumns.push(fakeColumn)
+    if (i > 0) {
+      const level2Column = `${fakeColumn}.${faker.lorem.word()}`
+      fakeColumns.push(level2Column)
+      if (i > 1) {
+        const level3Column = `${level2Column}.${faker.lorem.word()}`
+        fakeColumns.push(level3Column)
+      }
+    }
   }
 
   console.log("fakeColumns", fakeColumns);
