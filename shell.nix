@@ -1,7 +1,26 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-    go-jsonschema = pkgs.stdenv.mkDerivation {
+
+  ws4sqlite = pkgs.stdenv.mkDerivation {
+    pname = "ws4sqlite";
+    version = "0.16.2";
+    
+    src = pkgs.fetchurl {
+      url = "https://github.com/proofrock/ws4sqlite/releases/download/v0.16.2/ws4sqlite-v0.16.2-linux-amd64.tar.gz";
+      hash = "sha256-2scK/60xHGM5VkQq0ywl0eoEpL/yarebNQbkcYBmxyI=";
+    };
+    
+    sourceRoot = ".";
+    
+    installPhase = ''
+      mkdir -p $out/bin
+      cp ws4sqlite $out/bin/
+      chmod +x $out/bin/ws4sqlite
+    '';
+  };
+
+  go-jsonschema = pkgs.stdenv.mkDerivation {
     pname = "go-jsonschema";
     version = "0.16.0";
 
@@ -37,6 +56,8 @@ in pkgs.mkShell {
     pkgs.go
     pkgs.sqlite
     go-jsonschema
+
+    ws4sqlite  # Added here
   ] ++ [
     # frontend
     pkgs.nodePackages.pnpm
