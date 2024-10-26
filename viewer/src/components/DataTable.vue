@@ -315,7 +315,6 @@ const currentDisplayedRowsRange = ref('');
 
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
-  console.log(">>> detectedKeys", toRaw(collapsibleDataManager.collapsibleDataDetectedKeys.value));
   ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.collapsibleDataDetectedKeys.value)
   .filter(key => (
     key !== ColumnManager.EXPANDABLE_DATA_COLUMN

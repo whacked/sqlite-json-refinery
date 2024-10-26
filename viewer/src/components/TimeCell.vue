@@ -2,7 +2,7 @@
     <div class="time-cell"
     :style="{ background: backgroundColor }"
     >
-        {{ myDate.toISOString() }}
+        {{ myDate?.toISOString() }}
     </div>
 </template>
 
@@ -24,7 +24,18 @@ const props = defineProps<{
 }>();
 
 const myDate = computed(() => {
-  return new Date(props.params.value);
+  if (props.params.value == null) return null;
+  if (typeof props.params.value === 'number') {
+    // check if this should be adjusted
+    const maybeFutureDate = props.params.value * 1000;
+    if(Math.log10(maybeFutureDate) < 13.5) {
+      return new Date(maybeFutureDate);
+    } else {
+      return new Date(props.params.value);
+    }
+  } else {
+    return new Date(props.params.value);
+  }
 });
 
 interface TimeBreakpoints {
@@ -80,6 +91,7 @@ const getAgeColor = (date: Date, now: Date, breakpoints: TimeBreakpoints = defau
 };
 
 const backgroundColor = computed(() => {
+  if (myDate.value == null) return null;
   return getAgeColor(myDate.value, dataStore.now);
 });
-</script>
+</script> 
