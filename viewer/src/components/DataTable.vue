@@ -455,11 +455,6 @@ const updateColumnDefs = () => {
       headerName: 'Photo',
       cellRenderer: 'photoCellRenderer',
     },
-    topic: {
-      field: 'topic',
-      headerName: 'Topic',
-      cellRenderer: 'colorizedCategoricalCellRenderer',
-    },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: {
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
       headerName: 'collapsed data String (not shown; for filtering)',

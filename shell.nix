@@ -2,6 +2,11 @@
 
 let
 
+  nix_shortcuts = import (pkgs.fetchurl {
+    url = "https://raw.githubusercontent.com/whacked/setup/f6338a7796e24bdca23a3e5a2297309dffe84322/bash/nix_shortcuts.nix.sh";
+    hash = "sha256-jLbvJ52h12eug/5Odo04kvHqwOQRzpB9X3bUEB/vzxc=";
+  }) { inherit pkgs; };
+
   ws4sqlite = pkgs.stdenv.mkDerivation {
     pname = "ws4sqlite";
     version = "0.16.2";
@@ -62,9 +67,25 @@ in pkgs.mkShell {
     # frontend
     pkgs.nodePackages.pnpm
 
-  ];
+  ] ++ nix_shortcuts.buildInputs;
 
-  shellHook = ''
+  shellHook = nix_shortcuts.shellHook + ''
     export PATH=$PWD/result/bin:$PATH
+
+    generate-ws4sqlite-conf() {  # generate yaml file for ws4sqlite
+      if [ $# -ne 1 ]; then
+        echo "need path to database"
+        return
+      fi
+      database_file=$1
+      yaml_file=''${database_file%.*}.yaml
+      echo "generating file at $yaml_file"
+      echo "corsOrigin: '*'" >> $yaml_file
+      echo "readOnly: true" >> $yaml_file
+    }
+
+    alias serve-database="ws4sqlite -db"
+  '' + ''
+    echo-shortcuts ${__curPos.file}
   '';
 }
