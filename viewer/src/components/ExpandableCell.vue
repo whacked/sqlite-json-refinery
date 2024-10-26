@@ -28,8 +28,12 @@ const payloadRenderable = computed(() => {
     if (!hasKeys.value) return { rendered: "", keyCount: 0 };
     let numKeys = 0;
     const reducedPayload: Record<string, any> = {};
+
     for (const key of Object.keys(props.params.data.payload)) {
-        if (props.params.expandableDataExtractedKeys.has(key)) {
+        if (
+            props.params.expandableDataExtractedKeys.has(key)
+            || props.params.expandableDataHiddenKeys.has(key)
+        ) {
             continue;
         }
         reducedPayload[key] = props.params.data.payload[key];

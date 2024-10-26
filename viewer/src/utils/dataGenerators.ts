@@ -22,6 +22,14 @@ export function generateData(count: number) {
 
   console.log("fakeColumns", fakeColumns);
 
+  const randomCurrencies: string[] = [];
+  for (let i = 0; i < 5; ++i) {
+    randomCurrencies.push(faker.finance.currencyCode());
+  }
+  function getRandomCurrency() {
+    return randomCurrencies[Math.floor(Math.random() * randomCurrencies.length)];
+  }
+
   return Array.from({ length: count }, () => {
     const sharedShapeData = {
       id: faker.string.uuid(),
@@ -35,7 +43,10 @@ export function generateData(count: number) {
     }
 
     const extraData: { [key: string]: any } = {}
-    const numberOfExtraColumns = Math.floor(Math.random() * 30) + 1
+    extraData["quantity"] = `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`
+
+    /* const numberOfExtraColumns = Math.floor(Math.random() * 30) + 1 */
+    const numberOfExtraColumns = 4
     for (let i = 0; i < numberOfExtraColumns; i++) {
       if (Math.random() < 0.6) {
         continue;

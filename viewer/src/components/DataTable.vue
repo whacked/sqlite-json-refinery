@@ -41,7 +41,7 @@
           </tr>
 
           <tr>
-            <th>expandable keys</th><td>{{ expandableDataManager.expandableDataDetectedKeys.value }}</td>
+            <th>expandable keys</th><td>{{ expandableDataManager.detectedKeys.value }}</td>
           </tr>
           <tr>
             <th>unexpanded keys</th><td>{{ expandableDataManager.expandableDataUnexpandedKeys.value }}</td>
@@ -51,7 +51,7 @@
           </tr>
 
           <tr>
-            <th>collapsible keys</th><td>{{ collapsibleDataManager.collapsibleDataDetectedKeys.value }}</td>
+            <th>collapsible keys</th><td>{{ collapsibleDataManager.detectedKeys.value }}</td>
           </tr>
           <tr>
             <th>uncollapsed keys</th><td>{{ collapsibleDataManager.collapsibleDataExpandedKeys.value }}</td>
@@ -62,22 +62,57 @@
         </tbody>
       </table>
 
-      <h4>colorize columns</h4>
-      <ul class="column-options">
-        <li v-for="column in (
-          Array.from(ColumnManager.coreDetectedKeys.value)
-            .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
-            .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
-          )">
-          <label>
-            <input type="checkbox" :checked="ColumnManager.categoricalColumns.value.has(column)"
-              @change="toggleCategoricalColumn(column)"
-            />
-            {{ column }}
-          </label>
-        </li>
-      </ul>
-
+      <div>
+        <summary>colorize columns</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>column</th>
+              <th>categorical</th>
+              <th>time</th>
+              <th>coerce to number</th>
+              <th>extract units</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="column in (
+                Array.from(ColumnManager.coreDetectedKeys.value)
+                  .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
+                .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
+            )"
+            >
+              <td
+                :style="(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value.has(column) || ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value.has(column)) ? Colorizer.makeTextContainerStyle(column) : null"
+              >{{ column }}</td>
+              <td>
+                <label>
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(column)"
+                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.categoricalColumns)"
+                  />
+                </label>
+              </td>
+              <td>
+                <label>
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.timeColumns.value.has(column)"
+                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.timeColumns)"
+                  />
+                </label>
+              </td>
+              <td>
+                <label>
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(column)"
+                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.coerceToNumberColumns)"
+                  />
+                </label>
+              </td>
+              <td>
+                <button @click="extractUnits(column)">extract units</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!--
       NOTE: rowModelType: infinite is not supported with rowData;
@@ -165,25 +200,12 @@
   margin-bottom: 10px;
 }
 
-.column-options {
-  list-style-type: none;
-  padding: 0;
-}
-
-.column-options li {
-  display: inline-block;
-  margin-right: 10px;
-  border: 1px solid black;
-  padding: 5px;
-  font-size: 12pt;
-}
-
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, defineComponent, h, Ref, toRaw, watch } from 'vue';
+import { ref, onMounted, reactive, defineComponent, h, Ref, watch } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, RowNode, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
@@ -193,7 +215,7 @@ import { loadRemoteData } from '@/stores/remoteDataLoader';
 import chroma from 'chroma-js';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
-import { colorHash } from './styling';
+import { colorHash, Colorizer } from './styling';
 import { collapsibleDataManager, ContractableColumnsManager, expandableDataManager } from '@/utils/columnManager';
 
 
@@ -315,7 +337,7 @@ const currentDisplayedRowsRange = ref('');
 
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
-  ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.collapsibleDataDetectedKeys.value)
+  ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.detectedKeys.value)
   .filter(key => (
     key !== ColumnManager.EXPANDABLE_DATA_COLUMN
   ))
@@ -368,16 +390,14 @@ const removeColumnName = (column: string) => {
   }
 };
 
-
-const toggleCategoricalColumn = (column: string) => {
-  if (ColumnManager.categoricalColumns.value.has(column)) {
-    ColumnManager.categoricalColumns.value.delete(column);
+const toggleColumnTracker = (column: string, tracker: Ref<Set<string>>) => {
+  if (tracker.value.has(column)) {
+    tracker.value.delete(column);
   } else {
-    ColumnManager.categoricalColumns.value.add(column);
+    tracker.value.add(column);
   }
   updateColumnDefs();
 };
-
 
 const defaultColDef = reactive({
   flex: 1,
@@ -401,7 +421,74 @@ const autoSizeColumns = () => {
   gridApi.value?.autoSizeAllColumns();
 }
 
+function coerceToNumber(value: string) {
+  if(value == null || value == undefined || value == "") return null;
+  return parseFloat(value);
+}
+
+const extractUnits = async (column: string) => {
+  if(!gridApi.value) return;
+  function makeUnitColumn(unit: string) {
+    return `${column}.${unit}`;
+  }
+  const discoveredUnitColumns = new Set<string>();
+  const trackIsFromExpandedData = new Set<boolean>();
+  const rowsToUpdate: any[] = [];
+  for(let i = 0; i < gridApi.value.getDisplayedRowCount(); ++i) {
+    const row = gridApi.value.getDisplayedRowAtIndex(i);
+    if (!row || !row.data) continue;
+
+    // use a primitive method to check if the value is in the original data map
+    // or if it's an expandable-data value
+    const maybeInOriginalData = row.data[column];
+    const maybeInExpandedData = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column];
+    if(maybeInExpandedData === undefined && maybeInOriginalData === undefined) {
+      continue;
+    }
+
+    let rowValue: any
+    if (maybeInOriginalData !== undefined) {
+      trackIsFromExpandedData.add(false);
+      rowValue = maybeInOriginalData;
+    } else {
+      trackIsFromExpandedData.add(true);
+      rowValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column];
+    }
+
+    const parsedValue = ColumnManager.parseValueWithUnitSuffix(rowValue);
+    if (parsedValue.unit) {
+      const unitColumn = makeUnitColumn(parsedValue.unit);
+      discoveredUnitColumns.add(unitColumn);
+      row.data[unitColumn] = parsedValue.value;
+      rowsToUpdate.push(row.data); 
+    }
+  }
+
+  if (trackIsFromExpandedData.size !== 1) {
+    throw new Error(`Expected only 1 value for isFromExpandedData, but got ${trackIsFromExpandedData.size}`);
+  }
+
+  gridApi.value?.applyTransaction({ update: rowsToUpdate });
+
+  const isFromExpandedData = trackIsFromExpandedData.has(true);
+  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.push({
+    originalColumn: column,
+    isFromExpandedData,
+    derivedColumns: Array.from(discoveredUnitColumns),
+  });
+
+  // note this is super tricky because if the column is from the expanded data,
+  // it gets placed into the row data, which gets picked up as collapsed data
+  if(isFromExpandedData) {
+    expandableDataManager.hideKey(column);
+  } else {
+    collapsibleDataManager.hideKey(column);
+  }
+  updateColumnDefs();
+}
+
 const totalExpandableRows = ref<number>(0)
+
 const processRows = async () => {
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
   ColumnManager.coreDetectedKeys.value.clear();
@@ -413,7 +500,7 @@ const processRows = async () => {
       if (ColumnManager.COMMON_COLUMN_KEYS.value.has(key)) {
         ColumnManager.coreDetectedKeys.value.add(key);
       } else if(key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
-        collapsibleDataManager.collapsibleDataDetectedKeys.value.add(key);
+        collapsibleDataManager.detectedKeys.value.add(key);
       }
     });
     let expandableData: object | null = null;
@@ -422,7 +509,7 @@ const processRows = async () => {
       expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
       if (expandableData) {
         Object.keys(expandableData).forEach(key => {
-          expandableDataManager.expandableDataDetectedKeys.value.add(key);
+          expandableDataManager.detectedKeys.value.add(key);
           expandableDataManager.expandableDataUnexpandedKeys.value.add(key);
         });
       }
@@ -444,6 +531,12 @@ const updateColumnDefs = () => {
     coreDisplayParams: ColumnManager.COMMON_COLUMN_KEYS.value,
     expandableDataExtractedKeys: expandableDataManager.expandedExpandableDataKeys.value,
     collapsedDataKeys: collapsibleDataManager.collapsibleDataExpandedKeys.value,
+    collapsibleDataHiddenKeys: collapsibleDataManager.hiddenKeys.value,
+    expandableDataHiddenKeys: expandableDataManager.hiddenKeys.value,
+    // for whatever reason, passing the manager itself has different behavior
+    // or it's actually not the same object?
+    expandableDataManager,
+    collapsibleDataManager,
     toggleExpandCollapsibleKeys,
     toggleContractCollapsibleKeys,
     toggleExpandExpandableKeys,
@@ -465,7 +558,7 @@ const updateColumnDefs = () => {
     },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
-      headerName: `Collapsed (${collapsibleDataManager.collapsibleDataCollapsedKeys.value.size}/${collapsibleDataManager.collapsibleDataDetectedKeys.value.size})`,
+      headerName: `Collapsed (${collapsibleDataManager.collapsibleDataCollapsedKeys.value.size}/${collapsibleDataManager.detectedKeys.value.size})`,
       width: 200,
       headerClass: 'my-ag-table-collapsible-data-header',
       cellRenderer: 'extractedDataCellRenderer',
@@ -509,13 +602,13 @@ const updateColumnDefs = () => {
   };
 
   function selectRenderer(key: string) {
-    if (ColumnManager.timeColumns.value.has(key)) {
+    if (ColumnManager.ColumnTypeTracker.timeColumns.value.has(key)) {
       return {
         field: key,
         headerName: key,
         cellRenderer: 'timeCellRenderer',
       }
-    } else if (ColumnManager.categoricalColumns.value.has(key)) {
+    } else if (ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(key)) {
       return {
         field: key,
         headerName: key,
@@ -542,7 +635,22 @@ const updateColumnDefs = () => {
     .filter(colDef => colDef)
   );
 
-  const collapsedDataExtractedColumns: ColDef[] = Array.from(collapsibleDataManager.collapsibleDataExpandedKeys.value)
+  const derivedColumns: ColDef[] = [];
+  for(const group of ColumnManager.ColumnTypeTracker.derivedColumnGroups.value) {
+    for(const col of group.derivedColumns) {
+      // prevent the derived columns from being picked up as collapsed data
+      collapsibleDataManager.hideKey(col)
+      derivedColumns.push({
+        field: col,
+        headerName: col,
+        valueFormatter: (params: ValueFormatterParams) => {
+          return params.data[col];
+        },
+      });
+    }
+  }
+
+  const collapsedDataExtractedColumns: ColDef[] = Array.from(collapsibleDataManager.getVisibleKeys())
     .sort((a, b) => a.localeCompare(b))
     .map(key => ({
       field: key,
@@ -556,7 +664,7 @@ const updateColumnDefs = () => {
       },
     }));
 
-    const expandableDataExtractedColumns: ColDef[] = Array.from(expandableDataManager.expandedExpandableDataKeys.value)
+    const expandableDataExtractedColumns: ColDef[] = Array.from(expandableDataManager.getVisibleKeys())
     .sort((a, b) => a.localeCompare(b))
     .map(key => ({
       field: `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`,
@@ -566,6 +674,12 @@ const updateColumnDefs = () => {
       headerComponent: expandedPayloadColumnHeader,
        headerComponentParams: {
         key: key,
+      },
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(key)) {
+          return coerceToNumber(params.value);
+        }
+        return params.value;
       },
       cellRenderer: selectRenderer(key).cellRenderer,
     }));
@@ -580,6 +694,7 @@ const updateColumnDefs = () => {
       width: 40,
     },
     ...baseColumns,
+    ...derivedColumns,
     ...collapsedDataExtractedColumns,
     ...(totalExpandableRows.value > 0 ? [{
       field: ColumnManager.EXPANDABLE_DATA_COLUMN, 
@@ -807,7 +922,7 @@ const dataSource: IDatasource = {
       // when used as infinite datasource, it has problem
       for (const row of rows) {
         row.payload = JSON.parse(row.payload);
-        Object.keys(row.payload).forEach(key => collapsibleDataManager.collapsibleDataDetectedKeys.value.add(key));
+        Object.keys(row.payload).forEach(key => collapsibleDataManager.detectedKeys.value.add(key));
       }
       
       // If this is the last block of data, pass the actual row count

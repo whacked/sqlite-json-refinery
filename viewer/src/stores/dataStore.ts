@@ -4,7 +4,7 @@ import { ref } from 'vue';
 
 export const useDataStore = defineStore('data', () => {
   const data = ref<any[]>([]);
-  const totalRows = ref(1000); // Simulating a large dataset
+  const totalRows = ref(137); // Simulating a large dataset
 
   function initializeData() {
     // In a real scenario, this might involve setting up WebSocket connections or other initializations
