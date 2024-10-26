@@ -11,6 +11,9 @@ dependencies:
   ag-grid-vue3:
     specifier: ^32.2.2
     version: 32.2.2(typescript@5.6.3)
+  chroma-js:
+    specifier: ^3.1.2
+    version: 3.1.2
   color-hash:
     specifier: ^2.0.2
     version: 2.0.2
@@ -25,6 +28,9 @@ devDependencies:
   '@faker-js/faker':
     specifier: ^9.0.3
     version: 9.0.3
+  '@types/chroma-js':
+    specifier: ^2.4.4
+    version: 2.4.4
   '@types/color-hash':
     specifier: ^2.0.0
     version: 2.0.0
@@ -628,6 +634,10 @@ packages:
     dev: true
     optional: true
 
+  /@types/chroma-js@2.4.4:
+    resolution: {integrity: sha512-/DTccpHTaKomqussrn+ciEvfW4k6NAHzNzs/sts1TCqg333qNxOhy8TNIoQCmbGG3Tl8KdEhkGAssb1n3mTXiQ==}
+    dev: true
+
   /@types/color-hash@2.0.0:
     resolution: {integrity: sha512-wVZU2AthjkuxcK8IQl2lpVzWZxu/nuOoQfEBv0cxsbV8mVlCiPExNaw9/Z1PBC0ostupYr8KbTmT2J4+qrOW7w==}
     dev: true
@@ -788,6 +798,10 @@ packages:
     dependencies:
       balanced-match: 1.0.2
     dev: true
+
+  /chroma-js@3.1.2:
+    resolution: {integrity: sha512-IJnETTalXbsLx1eKEgx19d5L6SRM7cH4vINw/99p/M11HCuXGRWL+6YmCm7FWFGIo6dtWuQoQi1dc5yQ7ESIHg==}
+    dev: false
 
   /color-hash@2.0.2:
     resolution: {integrity: sha512-6exeENAqBTuIR1wIo36mR8xVVBv6l1hSLd7Qmvf6158Ld1L15/dbahR9VUOiX7GmGJBCnQyS0EY+I8x+wa7egg==}

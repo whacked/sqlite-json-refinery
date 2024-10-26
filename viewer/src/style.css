@@ -79,6 +79,9 @@ button:focus-visible {
 }
 .ag-header-cell-text {
   flex: 1;
+  padding: 0.5em;
+  font-size: 14pt;
+  overflow: hidden;
 }
 
 .ag-theme-quartz {
@@ -255,8 +258,4 @@ button:focus-visible {
 }
 
 .my-ag-table-expanded-column-header .ag-header-cell-text {
-  border: 1px solid black;
-  padding: 0.25em;
-  font-size: 12pt;
-  overflow: hidden;
 }

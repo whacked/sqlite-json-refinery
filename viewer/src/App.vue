@@ -151,7 +151,7 @@ const columnDefs2 = ref<ColDef[]>([
       return filteredPayload;
     },
     headerClass: 'my-ag-table-derived-column',
-    cellRenderer: (params: CellRendererParams) => {
+    cellRenderer: (params: ValueGetterParams) => {
       const stringRepresentation = JSON.stringify(params.value);
       const numKeys = Object.keys(params.value).length;
       return `<button onclick="alert(${numKeys})">(${numKeys}) ${stringRepresentation}</button>`;
@@ -189,7 +189,14 @@ interface RowFetchWindow {
 const dataSource2 = ref<IDatasource>({
   getRows: (params) => {
     console.log('Fetching rows:', params.startRow, 'to', params.endRow, "out of");
-    fetchData2(params.startRow, params.endRow).then(rowData => {
+
+    true && fetchData2_(params.startRow, params.endRow).then(rowData => {
+      console.log("got rows", rowData);
+      params.successCallback(rowData, 100000);
+    });
+    // TODO remove this
+
+    false && fetchData2(params.startRow, params.endRow).then(rowData => {
       console.log("got rows", rowData.rows, rowData.totalRowCount);
       if(rowData.rows.length === 0) {
         params.failCallback();
@@ -271,7 +278,7 @@ const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWin
 };
 
 const exampleLoadRemoteData = async () => {
-  const data = await loadRemoteData(1000, 1000);
+  const data = await loadRemoteData(345, 678);
   tableRowsCache.value = data.rows;
 }
 </script>

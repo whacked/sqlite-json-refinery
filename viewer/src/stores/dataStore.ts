@@ -25,5 +25,10 @@ export const useDataStore = defineStore('data', () => {
     return data.value.slice(startRow, endRow);
   }
 
-  return { initializeData, fetchData, totalRows };
+  return {
+    initializeData,
+    fetchData,
+    totalRows,
+    now: new Date(),
+  };
 });

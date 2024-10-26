@@ -41,28 +41,49 @@
           </tr>
 
           <tr>
-            <th>expandable keys</th><td>{{ ColumnManager.expandableDataDetectedKeys.value }}</td>
+            <th>expandable keys</th><td>{{ expandableDataManager.expandableDataDetectedKeys.value }}</td>
           </tr>
           <tr>
-            <th>unexpanded keys</th><td>{{ ColumnManager.expandableDataUnexpandedKeys.value }}</td>
+            <th>unexpanded keys</th><td>{{ expandableDataManager.expandableDataUnexpandedKeys.value }}</td>
           </tr>
           <tr>
-            <th>expanded keys</th><td>{{ ExpandableDataManager.expandedExpandableDataKeys.value }}</td>
+            <th>expanded keys</th><td>{{ expandableDataManager.expandedExpandableDataKeys.value }}</td>
           </tr>
 
           <tr>
-            <th>collapsible keys</th><td>{{ CollapsibleDataManager.collapsibleDataDetectedKeys.value }}</td>
+            <th>collapsible keys</th><td>{{ collapsibleDataManager.collapsibleDataDetectedKeys.value }}</td>
           </tr>
           <tr>
-            <th>uncollapsed keys</th><td>{{ CollapsibleDataManager.collapsibleDataExpandedKeys.value }}</td>
+            <th>uncollapsed keys</th><td>{{ collapsibleDataManager.collapsibleDataExpandedKeys.value }}</td>
           </tr>
           <tr>
-            <th>collapsed keys</th><td>{{ CollapsibleDataManager.collapsibleDataCollapsedKeys.value }}</td>
+            <th>collapsed keys</th><td>{{ collapsibleDataManager.collapsibleDataCollapsedKeys.value }}</td>
           </tr>
         </tbody>
       </table>
+
+      <h4>colorize columns</h4>
+      <ul class="column-options">
+        <li v-for="column in (
+          Array.from(ColumnManager.coreDetectedKeys.value)
+            .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
+            .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
+          )">
+          <label>
+            <input type="checkbox" :checked="ColumnManager.categoricalColumns.value.has(column)"
+              @change="toggleCategoricalColumn(column)"
+            />
+            {{ column }}
+          </label>
+        </li>
+      </ul>
+
+
       <!--
-      NOTE: rowModelType: infinite is not supported with rowData
+      NOTE: rowModelType: infinite is not supported with rowData;
+      to use generated data, x- out:
+        x-rowModelType="infinite"
+        :x-datasource="dataSource"
       -->
       <ag-grid-vue
         v-if="props.rowData.length == 0"
@@ -71,13 +92,17 @@
         :columnDefs="columnDefs"
         :defaultColDef="defaultColDef"
         :components="components"
-        rowModelType="infinite"
-        :datasource="dataSource"
+
+        x-rowModelType="infinite"
+
+        :x-datasource="rowData.length > 0 ? dataSource : null"
+        :rowData="rowData"
+
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
         :maxBlocksInCache="maxBlocksInCache"
         :rowBuffer="rowBuffer"
-        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || ColumnManager.collapsableDataExtractedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
         @grid-ready="onGridReady"
         @model-updated="onModelUpdated"
         @first-data-rendered="onFirstDataRendered"
@@ -96,7 +121,7 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
-        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || ColumnManager.collapsableDataExtractedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
 
         colon-paginationPageSize="paginationPageSize"
 
@@ -140,12 +165,25 @@
   margin-bottom: 10px;
 }
 
+.column-options {
+  list-style-type: none;
+  padding: 0;
+}
+
+.column-options li {
+  display: inline-block;
+  margin-right: 10px;
+  border: 1px solid black;
+  padding: 5px;
+  font-size: 12pt;
+}
+
 </style>
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, defineComponent, h, Ref, toRaw, watch } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, ValueGetterParams } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
@@ -227,6 +265,8 @@ const components = {
   payloadCellRenderer: ExpandableCell,
   extractedDataCellRenderer: CollapsableCell,
   photoCellRenderer: PhotoCell,
+  timeCellRenderer: TimeCell,
+  colorizedCategoricalCellRenderer: ColorizedCategoricalCell,
 };
 
 const dataStore = useDataStore();
@@ -275,7 +315,7 @@ const currentDisplayedRowsRange = ref('');
 
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
-  console.log(">>> detectedKeys", toRaw(CollapsibleDataManager.collapsibleDataDetectedKeys.value));
+  console.log(">>> detectedKeys", toRaw(collapsibleDataManager.collapsibleDataDetectedKeys.value));
   ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.collapsibleDataDetectedKeys.value)
   .filter(key => (
     key !== ColumnManager.EXPANDABLE_DATA_COLUMN
@@ -326,6 +366,14 @@ const removeColumnName = (column: string) => {
 };
 
 
+const toggleCategoricalColumn = (column: string) => {
+  if (ColumnManager.categoricalColumns.value.has(column)) {
+    ColumnManager.categoricalColumns.value.delete(column);
+  } else {
+    ColumnManager.categoricalColumns.value.add(column);
+  }
+  updateColumnDefs();
+};
 
 
 const defaultColDef = reactive({
@@ -402,12 +450,15 @@ const updateColumnDefs = () => {
   const coreDisplayParamSettings: Record<string, ColDef> = {
     id: { field: 'id', headerName: 'ID', width: 100 },
     country: { field: 'country', headerName: 'Country', width: 150 },
-    createdAt: { field: 'createdAt', headerName: 'Created At', width: 200 },
     photo: {
       field: 'photo',
       headerName: 'Photo',
-      width: 100,
       cellRenderer: 'photoCellRenderer',
+    },
+    topic: {
+      field: 'topic',
+      headerName: 'Topic',
+      cellRenderer: 'colorizedCategoricalCellRenderer',
     },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: {
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
@@ -459,6 +510,28 @@ const updateColumnDefs = () => {
     },
   };
 
+  function selectRenderer(key: string) {
+    if (ColumnManager.timeColumns.value.has(key)) {
+      return {
+        field: key,
+        headerName: key,
+        cellRenderer: 'timeCellRenderer',
+      }
+    } else if (ColumnManager.categoricalColumns.value.has(key)) {
+      return {
+        field: key,
+        headerName: key,
+        cellRenderer: 'colorizedCategoricalCellRenderer',
+      }
+    } else {
+      return coreDisplayParamSettings[key] ?? {
+        field: key,
+        headerName: key,
+        cellRenderer: null,
+      }
+    }
+  }
+
   const baseColumns: ColDef[] = (
     Array.from(ColumnManager.coreDetectedKeys.value)
     .concat([
@@ -467,10 +540,7 @@ const updateColumnDefs = () => {
       ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
       ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
     ])
-    .map(key => coreDisplayParamSettings[key] ?? {
-      field: key,
-      headerName: key,
-    })
+    .map(key => selectRenderer(key))
     .filter(colDef => colDef)
   );
 
@@ -481,9 +551,7 @@ const updateColumnDefs = () => {
       headerName: `${key}`,
       headerClass: 'my-ag-table-collapsible-data-expanded-column',
       cellClass: 'my-ag-table-collapsible-data-expanded-cell',
-      cellRenderer: (params: ColumnManager.RenderParams, _: any) => {
-        return params.data[key]?.toString()
-      },
+      cellRenderer: selectRenderer(key).cellRenderer,
       headerComponent: expandedCollapsibleDataColumnHeader,
       headerComponentParams: {
         key: key,
@@ -501,9 +569,7 @@ const updateColumnDefs = () => {
        headerComponentParams: {
         key: key,
       },
-      cellRenderer: (params: ColumnManager.RenderParams, _: any) => {
-        return params.data[ColumnManager.EXPANDABLE_DATA_COLUMN][key];
-      },
+      cellRenderer: selectRenderer(key).cellRenderer,
     }));
 
   columnDefs.value = [

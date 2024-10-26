@@ -13,7 +13,7 @@ payloadRenderable.rendered<template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RenderParams } from '@/utils/columnManager';
+import { collapsibleDataManager, RenderParams } from '@/utils/columnManager';
 import * as ColumnManager from '@/utils/columnManager';
 
 const props = defineProps<{
@@ -26,7 +26,7 @@ const collapsedData = computed(() => {
         new Set([
             ...ColumnManager.COMMON_COLUMN_KEYS.value,
             ...ColumnManager.SPECIAL_COLUMN_KEYS,
-            ...ColumnManager.collapsableDataExtractedKeys.value
+            ...collapsibleDataManager.collapsibleDataExpandedKeys.value
         ])
     );
     const keyCount = Object.keys(subsetData).length;

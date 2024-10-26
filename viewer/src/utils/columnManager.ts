@@ -107,6 +107,7 @@ export const collapsibleDataManager = new CollapsibleColumnsManager();
 export interface RenderParams {
     node?: IRowNode<any>;
     data?: any;
+    value?: any;
     coreDisplayParams: Set<string>;
     collapsedDataKeys: Set<string>;
     expandableDataExtractedKeys: Set<string>;
