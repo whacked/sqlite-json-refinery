@@ -171,6 +171,15 @@
         @body-scroll="onBodyScroll"
       >
       </ag-grid-vue>
+
+      <div>
+        <label>
+          <input type="checkbox" @change="togglePlot" />
+          Show plot
+        </label>
+        <div ref="plotContainer"></div>
+      </div>
+      
     </div>
   </div>
 </template>
@@ -892,6 +901,69 @@ const onQuickFilterChanged = () => {
 onMounted(() => {
 });
 
+
+import * as Plotly from 'plotly.js-dist';
+const plotContainer = ref(null);
+
+const togglePlot = (event: Event) => {
+  const isChecked = (event.target as HTMLInputElement).checked;
+  if(!isChecked) {
+    return;
+  }
+
+  let timeColumnCandidate: string | null = null;
+  for(const col of ColumnManager.ColumnTypeTracker.timeColumns.value) {
+    if(rowData.value.every(row => row[col] != null)) {
+      timeColumnCandidate = col;
+      break;
+    }
+  }
+
+  let valueColumnCandidate: string | null = null;
+  for(const group of ColumnManager.ColumnTypeTracker.derivedColumnGroups.value) {
+    for(const col of group.derivedColumns) {
+      if(rowData.value.some(row => row[col] != null)) {
+        valueColumnCandidate = col;
+        break;
+      }
+    }
+  }
+
+  if(timeColumnCandidate == null) {
+    console.warn("No time column candidate found");
+    return;
+  }
+  if(valueColumnCandidate == null) {
+    console.warn("No value column candidate found");
+    return;
+  }
+
+  const X: any[] = [];
+  const Y: any[] = [];
+
+  for(const row of rowData.value) {
+    X.push(ColumnManager.parseTimeValue(row[timeColumnCandidate]));
+    Y.push(row[valueColumnCandidate]);
+  }
+  new Plotly.newPlot(plotContainer.value, [{
+    x: X,
+    y: Y,
+    type: 'scatter',
+    mode: 'markers',
+    marker: {
+      size: 10,
+      symbol: 'circle',
+    },
+  }], {
+    xaxis: {
+      title: timeColumnCandidate,
+      type: 'date'
+    },
+    yaxis: {
+      title: valueColumnCandidate
+    }
+  });
+}
 
 watch(
   () => props.rowData,
