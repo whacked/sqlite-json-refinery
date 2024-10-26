@@ -156,7 +156,7 @@ import chroma from 'chroma-js';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
 import { colorHash } from './styling';
-import { CollapsibleDataManager, ExpandableDataManager } from '@/utils/columnManager';
+import { collapsibleDataManager, ContractableColumnsManager, expandableDataManager } from '@/utils/columnManager';
 
 
 const props = defineProps<{
@@ -164,7 +164,7 @@ const props = defineProps<{
 }>();
 
 
-function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
+function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
   return defineComponent({
     props: ['displayName', 'onCustomAction'],
     setup(props) {
@@ -174,7 +174,7 @@ function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
 
       const collapseKey = () => {
         const keyToRemove = params.key;
-        keyTrackerProxy.value.delete(keyToRemove);
+        columnsManager.contractKey(keyToRemove);
         updateColumnDefs();
       };
 
@@ -192,9 +192,13 @@ function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
       }, [
         ...(
           params.displayName.split('.').map((word: string, index: number) => {
+            const backgroundColor = colorHash.hex(word);
+            const isDark = chroma(backgroundColor).luminance() < 0.6;
+            const textColor = isDark ? 'white' : 'black';
+
             return h('span', {
               class: 'ag-header-cell-text',
-              style: { background: colorHash.hex(word) },
+              style: { background: backgroundColor, color: textColor },
             }, index > 0 ? '.' + word : word)
           })
         ),
@@ -214,8 +218,8 @@ function makeExpandedColumnHeader(keyTrackerProxy: Ref<Set<string>>) {
   })
 }
 
-const expandedPayloadColumnHeader = makeExpandedColumnHeader(ColumnManager.expandedExpandableDataKeys);
-const expandedCollapsibleDataColumnHeader = makeExpandedColumnHeader(ColumnManager.collapsibleDataExpandedKeys);
+const expandedPayloadColumnHeader = makeExpandedColumnHeader(expandableDataManager);
+const expandedCollapsibleDataColumnHeader = makeExpandedColumnHeader(collapsibleDataManager);
 
 const components = {
   expandedPayloadColumnHeader,
@@ -272,7 +276,7 @@ const currentDisplayedRowsRange = ref('');
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
   console.log(">>> detectedKeys", toRaw(CollapsibleDataManager.collapsibleDataDetectedKeys.value));
-  ColumnManager.availableColumns.value = Array.from(CollapsibleDataManager.collapsibleDataDetectedKeys.value)
+  ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.collapsibleDataDetectedKeys.value)
   .filter(key => (
     key !== ColumnManager.EXPANDABLE_DATA_COLUMN
   ))
@@ -347,18 +351,18 @@ const autoSizeColumns = () => {
 }
 
 const totalExpandableRows = ref<number>(0)
-const coreDetectedKeys = ref<Set<string>>(new Set());
 const processRows = async () => {
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
-  CollapsibleDataManager.clearAll();
-  ExpandableDataManager.clearAll();
+  ColumnManager.coreDetectedKeys.value.clear();
+  collapsibleDataManager.clearAll();
+  expandableDataManager.clearAll();
 
   rowData.value = sourceData.map(row => {
     Object.keys(row).forEach(key => {
       if (ColumnManager.COMMON_COLUMN_KEYS.value.has(key)) {
-        coreDetectedKeys.value.add(key);
-      } else {
-        CollapsibleDataManager.collapsibleDataDetectedKeys.value.add(key);
+        ColumnManager.coreDetectedKeys.value.add(key);
+      } else if(key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
+        collapsibleDataManager.collapsibleDataDetectedKeys.value.add(key);
       }
     });
     let expandableData: object | null = null;
@@ -367,12 +371,12 @@ const processRows = async () => {
       expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
       if (expandableData) {
         Object.keys(expandableData).forEach(key => {
-          ExpandableDataManager.expandableDataDetectedKeys.value.add(key);
-          ExpandableDataManager.expandableDataUnexpandedKeys.value.add(key);
+          expandableDataManager.expandableDataDetectedKeys.value.add(key);
+          expandableDataManager.expandableDataUnexpandedKeys.value.add(key);
         });
       }
     }
-    CollapsibleDataManager.resetKeys()
+    collapsibleDataManager.resetKeys()
     return {
       ...row,
       [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: JSON.stringify(ColumnManager.objectWithoutKeys(row, ColumnManager.SPECIAL_COLUMN_KEYS)),
@@ -387,8 +391,8 @@ const processRows = async () => {
 const updateColumnDefs = () => {
   const cellRendererParams: ColumnManager.RenderParams = {
     coreDisplayParams: ColumnManager.COMMON_COLUMN_KEYS.value,
-    expandableDataExtractedKeys: ExpandableDataManager.expandedExpandableDataKeys.value,
-    collapsedDataKeys: CollapsibleDataManager.collapsibleDataExpandedKeys.value,
+    expandableDataExtractedKeys: expandableDataManager.expandedExpandableDataKeys.value,
+    collapsedDataKeys: collapsibleDataManager.collapsibleDataExpandedKeys.value,
     toggleExpandCollapsibleKeys,
     toggleContractCollapsibleKeys,
     toggleExpandExpandableKeys,
@@ -412,7 +416,7 @@ const updateColumnDefs = () => {
     },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
-      headerName: 'Collapsed Data',
+      headerName: `Collapsed (${collapsibleDataManager.collapsibleDataCollapsedKeys.value.size}/${collapsibleDataManager.collapsibleDataDetectedKeys.value.size})`,
       width: 200,
       headerClass: 'my-ag-table-collapsible-data-header',
       cellRenderer: 'extractedDataCellRenderer',
@@ -427,17 +431,17 @@ const updateColumnDefs = () => {
           return () => h('div', { class: 'my-ag-table-collapsible-data-header' }, [
             h('div', {}, [
               h('div', { class: 'ag-header-cell-text' },
-                CollapsibleDataManager.collapsibleDataCollapsedKeys.value.size == 0 ? "" : params.displayName
+                collapsibleDataManager.collapsibleDataCollapsedKeys.value.size == 0 ? "" : params.displayName
               ),
             ]),
             h('div', { class: 'button-container' }, [
               h('div', {}, [
-                CollapsibleDataManager.collapsibleDataExpandedKeys.value.size > 0 && h('button', {
+                collapsibleDataManager.collapsibleDataExpandedKeys.value.size > 0 && h('button', {
                   class: 'ag-my collapse all',
                   title: 'Collapse all',
                   onClick: collapseAllCollapsibleRows
                 }, '◀'),
-                CollapsibleDataManager.collapsibleDataCollapsedKeys.value.size > 0 && h('button', {
+                collapsibleDataManager.collapsibleDataCollapsedKeys.value.size > 0 && h('button', {
                   class: 'ag-my expand all',
                   title: 'Expand all',
                   onClick: restoreAllCollapsedRows
@@ -456,7 +460,7 @@ const updateColumnDefs = () => {
   };
 
   const baseColumns: ColDef[] = (
-    Array.from(coreDetectedKeys.value)
+    Array.from(ColumnManager.coreDetectedKeys.value)
     .concat([
       ColumnManager.COLLAPSABLE_DATA_COLUMN,
       // needed for filtering
@@ -470,7 +474,7 @@ const updateColumnDefs = () => {
     .filter(colDef => colDef)
   );
 
-  const collapsedDataExtractedColumns: ColDef[] = Array.from(CollapsibleDataManager.collapsibleDataExpandedKeys.value)
+  const collapsedDataExtractedColumns: ColDef[] = Array.from(collapsibleDataManager.collapsibleDataExpandedKeys.value)
     .sort((a, b) => a.localeCompare(b))
     .map(key => ({
       field: key,
@@ -486,7 +490,7 @@ const updateColumnDefs = () => {
       },
     }));
 
-    const expandableDataExtractedColumns: ColDef[] = Array.from(ExpandableDataManager.expandedExpandableDataKeys.value)
+    const expandableDataExtractedColumns: ColDef[] = Array.from(expandableDataManager.expandedExpandableDataKeys.value)
     .sort((a, b) => a.localeCompare(b))
     .map(key => ({
       field: `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`,
@@ -530,17 +534,17 @@ const updateColumnDefs = () => {
           return () => h('div', { class: 'my-ag-table-expandable-data-header' }, [
             h('div', {}, [
               h('div', { class: 'ag-header-cell-text' },
-                ExpandableDataManager.expandableDataUnexpandedKeys.value.size == 0 ? "" : params.displayName
+                expandableDataManager.expandableDataUnexpandedKeys.value.size == 0 ? "" : params.displayName
               ),
             ]),
             h('div', { class: 'button-container' }, [
               h('div', {}, [
-                ExpandableDataManager.expandedExpandableDataKeys.value.size > 0 && h('button', {
+                expandableDataManager.expandedExpandableDataKeys.value.size > 0 && h('button', {
                   class: 'ag-my collapse all',
                   title: 'Collapse all',
                   onClick: contractAllExpandableRows
                 }, '◀'),
-                ExpandableDataManager.expandableDataUnexpandedKeys.value.size > 0 && h('button', {
+                expandableDataManager.expandableDataUnexpandedKeys.value.size > 0 && h('button', {
                   class: 'ag-my expand all',
                   title: 'Expand all',
                   onClick: expandAllExpandableRows
@@ -557,16 +561,16 @@ const updateColumnDefs = () => {
 };
 
 const toggleExpandExpandableKeys = (rowIndex: number) => {
-  if (ExpandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
-    ExpandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
+  if (expandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
+    expandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
   } else {
-    ExpandableDataManager.expandedExpandableDataRows.value.add(rowIndex);
+    expandableDataManager.expandedExpandableDataRows.value.add(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
         Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-          ExpandableDataManager.expandedExpandableDataKeys.value.add(key);
-          ExpandableDataManager.expandableDataUnexpandedKeys.value.delete(key);
+          expandableDataManager.expandedExpandableDataKeys.value.add(key);
+          expandableDataManager.expandableDataUnexpandedKeys.value.delete(key);
         });
       }
     }
@@ -575,16 +579,16 @@ const toggleExpandExpandableKeys = (rowIndex: number) => {
 };
 
 const toggleContractExpandableKeys = (rowIndex: number) => {
-  if (!ExpandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
+  if (!expandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
     return;
   } else {
-    ExpandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
+    expandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
         Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-          ExpandableDataManager.expandedExpandableDataKeys.value.delete(key);
-          ExpandableDataManager.expandableDataUnexpandedKeys.value.add(key);
+          expandableDataManager.expandedExpandableDataKeys.value.delete(key);
+          expandableDataManager.expandableDataUnexpandedKeys.value.add(key);
         });
       }
     }
@@ -594,10 +598,10 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
 
 const toggleExpandCollapsibleKeys = (rowIndex: number) => {
   console.log("!!!toggleExpandExtraDataKeys", rowIndex);
-  if (CollapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
-    CollapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
+  if (collapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
+    collapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
   } else {
-    CollapsibleDataManager.collapsibleDataExpandedRows.value.add(rowIndex);
+    collapsibleDataManager.collapsibleDataExpandedRows.value.add(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
       console.log("row", row);
@@ -605,8 +609,8 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
         key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
       ).forEach(key => {
         console.log("adding key", key);
-        CollapsibleDataManager.collapsibleDataExpandedKeys.value.add(key)
-        CollapsibleDataManager.collapsibleDataCollapsedKeys.value.delete(key);
+        collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key)
+        collapsibleDataManager.collapsibleDataCollapsedKeys.value.delete(key);
       });
     }
   }
@@ -614,17 +618,17 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
 }
 
 const toggleContractCollapsibleKeys = (rowIndex: number) => {
-  if (!CollapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
+  if (!collapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
     return;
   } else {
-    CollapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
+    collapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
       Object.keys(row).filter(
         key => (!ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key))
       ).forEach(key => {
-        CollapsibleDataManager.collapsibleDataExpandedKeys.value.delete(key);
-        CollapsibleDataManager.collapsibleDataCollapsedKeys.value.add(key);
+        collapsibleDataManager.collapsibleDataExpandedKeys.value.delete(key);
+        collapsibleDataManager.collapsibleDataCollapsedKeys.value.add(key);
       });
     }
   }
@@ -633,18 +637,18 @@ const toggleContractCollapsibleKeys = (rowIndex: number) => {
 
 const restoreAllCollapsedRows = () => {
   rowData.value.forEach(row => {
-    CollapsibleDataManager.collapsibleDataExpandedRows.value.add(row.id);
+    collapsibleDataManager.collapsibleDataExpandedRows.value.add(row.id);
     Object.keys(row).filter(
       key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
-    ).forEach(key => CollapsibleDataManager.collapsibleDataExpandedKeys.value.add(key));
+    ).forEach(key => collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key));
   });
-  CollapsibleDataManager.collapsibleDataCollapsedKeys.value.clear();
+  collapsibleDataManager.collapsibleDataCollapsedKeys.value.clear();
   updateColumnDefs();
 };
 
 const collapseAllCollapsibleRows = () => {
-  CollapsibleDataManager.collapsibleDataExpandedRows.value.clear();
-  CollapsibleDataManager.resetKeys();
+  collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
+  collapsibleDataManager.resetKeys();
   updateColumnDefs();
 };
 
@@ -655,21 +659,21 @@ const expandAllExpandableRows = () => {
     if (row.payload) {
       const payloadKeys = Object.keys(row.payload);
       if (payloadKeys.length > 0) {
-        ExpandableDataManager.expandedExpandableDataRows.value.add(row.id);
-        payloadKeys.forEach(key => ExpandableDataManager.expandedExpandableDataKeys.value.add(key));
+        expandableDataManager.expandedExpandableDataRows.value.add(row.id);
+        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(key));
         isDirty = true;
       }
     }
   });
   if (isDirty) {
-    ExpandableDataManager.expandableDataUnexpandedKeys.value.clear();
+    expandableDataManager.expandableDataUnexpandedKeys.value.clear();
     updateColumnDefs();
   }
 };
 
 const contractAllExpandableRows = () => {
-  ExpandableDataManager.expandedExpandableDataKeys.value.clear();
-  ExpandableDataManager.resetKeys();
+  expandableDataManager.expandedExpandableDataKeys.value.clear();
+  expandableDataManager.resetKeys();
   updateColumnDefs();
 };
 
@@ -723,8 +727,8 @@ const dataSource: IDatasource = {
   getRows: async (params) => {
     const { startRow, endRow, successCallback, failCallback } = params;
     
-    CollapsibleDataManager.clearAll();
-    ExpandableDataManager.clearAll();
+    collapsibleDataManager.clearAll();
+    expandableDataManager.clearAll();
 
     try {
       const limit = endRow - startRow;
@@ -739,7 +743,7 @@ const dataSource: IDatasource = {
       // when used as infinite datasource, it has problem
       for (const row of rows) {
         row.payload = JSON.parse(row.payload);
-        Object.keys(row.payload).forEach(key => CollapsibleDataManager.collapsibleDataDetectedKeys.value.add(key));
+        Object.keys(row.payload).forEach(key => collapsibleDataManager.collapsibleDataDetectedKeys.value.add(key));
       }
       
       // If this is the last block of data, pass the actual row count
