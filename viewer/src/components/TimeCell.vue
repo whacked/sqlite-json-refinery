@@ -14,7 +14,7 @@
 </style>
 
 <script setup lang="ts">
-import { RenderParams } from '@/utils/columnManager';
+import { parseTimeValue, RenderParams } from '@/utils/columnManager';
 import { useDataStore } from '@/stores/dataStore';
 import { computed } from 'vue';
 
@@ -24,18 +24,7 @@ const props = defineProps<{
 }>();
 
 const myDate = computed(() => {
-  if (props.params.value == null) return null;
-  if (typeof props.params.value === 'number') {
-    // check if this should be adjusted
-    const maybeFutureDate = props.params.value * 1000;
-    if(Math.log10(maybeFutureDate) < 13.5) {
-      return new Date(maybeFutureDate);
-    } else {
-      return new Date(props.params.value);
-    }
-  } else {
-    return new Date(props.params.value);
-  }
+  return parseTimeValue(props.params.value);
 });
 
 interface TimeBreakpoints {

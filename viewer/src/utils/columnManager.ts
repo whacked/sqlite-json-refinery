@@ -214,3 +214,18 @@ export function parseValueWithUnitSuffix(value: string, shouldForceLowerCaseUnit
         unit: shouldForceLowerCaseUnit ? match[2].toLowerCase() : match[2],
     };
 }
+
+export function parseTimeValue(value: string | number | null): Date | null {
+    if (value == null) return null;
+    if (typeof value === 'number') {
+        // check if this should be adjusted
+        const maybeFutureDate = value * 1000;
+        if (Math.log10(maybeFutureDate) < 13.5) {
+            return new Date(maybeFutureDate);
+        } else {
+            return new Date(value);
+        }
+    } else {
+        return new Date(value);
+    }
+}
