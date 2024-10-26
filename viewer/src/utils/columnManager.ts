@@ -39,15 +39,40 @@ export const availableColumns = ref<DispalyableColumn[]>(
     ) */
 );
 
-export const expandableDataDetectedKeys = ref(new Set<string>());
-export const expandedExpandableDataRows = ref(new Set<number>());
-export const expandedExpandableDataKeys = ref(new Set<string>());
-export const expandableDataUnexpandedKeys = ref(new Set<string>());
+export namespace ExpandableDataManager {
+    export const expandableDataDetectedKeys = ref(new Set<string>());
+    export const expandedExpandableDataRows = ref(new Set<number>());
+    export const expandedExpandableDataKeys = ref(new Set<string>());
+    export const expandableDataUnexpandedKeys = ref(new Set<string>());
 
-export const collapsibleDataDetectedKeys = ref(new Set<string>());
-export const collapsibleDataExpandedRows = ref(new Set<number>());
-export const collapsibleDataCollapsedKeys = ref(new Set<string>());
-export const collapsibleDataExpandedKeys = ref(new Set<string>());
+    export function resetKeys() {
+        expandedExpandableDataKeys.value.clear()
+        expandableDataUnexpandedKeys.value = new Set(expandableDataDetectedKeys.value);
+    }
+
+    export function clearAll() {
+        expandableDataDetectedKeys.value.clear();
+        resetKeys();
+    }
+}
+
+
+export namespace CollapsibleDataManager {
+    export const collapsibleDataDetectedKeys = ref(new Set<string>());
+    export const collapsibleDataExpandedRows = ref(new Set<number>());
+    export const collapsibleDataCollapsedKeys = ref(new Set<string>());
+    export const collapsibleDataExpandedKeys = ref(new Set<string>());
+
+    export function resetKeys() {
+        collapsibleDataExpandedKeys.value.clear()
+        collapsibleDataCollapsedKeys.value = new Set(collapsibleDataDetectedKeys.value);
+    }
+
+    export function clearAll() {
+        collapsibleDataDetectedKeys.value.clear();
+        resetKeys();
+    }
+}
 
 
 export interface RenderParams {

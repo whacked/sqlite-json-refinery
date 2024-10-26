@@ -13,22 +13,27 @@
 
   <button @click="loadFile">Load JSONL File</button>
   <button @click="exampleLoadRemoteData">Load Remote Data</button>
+  <code>
+    {{ tableRowsCache.length }} items in cache
+  </code>
   <DataTable
-    v-if="fileCache.length > 0"
-    :rowData="Array.from(fileCache.values())"
+    v-if="tableRowsCache.length > 0"
+    :rowData="Array.from(tableRowsCache.values())"
    />
    <DataTable
     v-else
     :rowData="[]"
    />
-  <label v-if="fileCache.length > 0">
+  <label v-if="tableRowsCache.length > 0">
     <input type="checkbox" v-model="showTestTable" />
     Show Test Table
   </label>
+
   <ag-grid-vue
-    v-if="showTestTable && fileCache.length > 0"
+    v-if="showTestTable && tableRowsCache.length > 0"
     class="ag-theme-alpine"
     style="height: 500px; width: 100%;"
+
     :columnDefs="columnDefs2"
     :rowModelType="'infinite'"
     :cacheBlockSize="10"
@@ -210,7 +215,7 @@ async function getFileHandle() {
   }
 }
 
-const fileCache = ref<any[]>([]);
+const tableRowsCache = ref<any[]>([]);
 const showTestTable = ref<boolean>(false);
 
 async function loadFile() {
@@ -223,26 +228,26 @@ async function loadFile() {
     if (line.trim() !== '') {
       try {
         const parsedLine = JSON.parse(line);
-        fileCache.value.push(parsedLine);
+        tableRowsCache.value.push(parsedLine);
       } catch (error) {
         console.error('Error parsing line:', line);
         console.error(error);
       }
     }
   }
-  console.log('fileCache length:', fileCache.value.length);
+  console.log('fileCache length:', tableRowsCache.value.length);
 }
 
 
 const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWindow> => {
-  console.log(fileCache.value)
+  console.log(tableRowsCache.value)
 
-  if (fileCache.value.length >= endRow) {
+  if (tableRowsCache.value.length >= endRow) {
     return {
-      rows: fileCache.value.slice(startRow, endRow),
+      rows: tableRowsCache.value.slice(startRow, endRow),
       startIndex: startRow,
       endIndex: endRow,
-      totalRowCount: fileCache.value.length,
+      totalRowCount: tableRowsCache.value.length,
     };
   }
 
@@ -253,20 +258,20 @@ const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWin
     totalRowCount: 0,
   };
 
-  if (fileCache.value.length === 0) {
+  if (tableRowsCache.value.length === 0) {
     await loadFile();
   }
 
   return {
-    rows: fileCache.value.slice(startRow, endRow),
+    rows: tableRowsCache.value.slice(startRow, endRow),
     startIndex: startRow,
     endIndex: endRow,
-    totalRowCount: fileCache.value.length,
+    totalRowCount: tableRowsCache.value.length,
   };
 };
 
 const exampleLoadRemoteData = async () => {
   const data = await loadRemoteData(1000, 1000);
-  fileCache.value = data.rows;
+  tableRowsCache.value = data.rows;
 }
 </script>
