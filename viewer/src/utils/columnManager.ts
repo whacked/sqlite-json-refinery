@@ -39,10 +39,15 @@ export const availableColumns = ref<DispalyableColumn[]>(
     ) */
 );
 
+export const expandableDataDetectedKeys = ref(new Set<string>());
 export const expandedExpandableDataRows = ref(new Set<number>());
 export const expandedExpandableDataKeys = ref(new Set<string>());
-export const collapsableDataExpandedRows = ref(new Set<number>());
-export const collapsableDataExtractedKeys = ref(new Set<string>());
+export const expandableDataUnexpandedKeys = ref(new Set<string>());
+
+export const collapsibleDataDetectedKeys = ref(new Set<string>());
+export const collapsibleDataExpandedRows = ref(new Set<number>());
+export const collapsibleDataCollapsedKeys = ref(new Set<string>());
+export const collapsibleDataExpandedKeys = ref(new Set<string>());
 
 
 export interface RenderParams {
