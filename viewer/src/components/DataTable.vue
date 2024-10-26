@@ -262,7 +262,7 @@ const expandedCollapsibleDataColumnHeader = makeExpandedColumnHeader(collapsible
 const components = {
   expandedPayloadColumnHeader,
   expandedExtraDataColumnHeader: expandedCollapsibleDataColumnHeader,
-  payloadCellRenderer: ExpandableCell,
+  expandableCellRenderer: ExpandableCell,
   extractedDataCellRenderer: CollapsableCell,
   photoCellRenderer: PhotoCell,
   timeCellRenderer: TimeCell,
@@ -322,6 +322,10 @@ const onModelUpdated = () => {
   ))
   // .filter(key => ColumnManager.COMMON_COLUMN_KEYS.value.has(key))
   .map(key => ({ key, isEnabled: ColumnManager.COMMON_COLUMN_KEYS.value.has(key) }));
+  ColumnManager.availableColumns.value = [{
+    key: 'id',
+    isEnabled: true,
+  }];
   updateRowCount();
 };
 
@@ -333,8 +337,8 @@ const updateRowCount = () => {
   if (!gridApi.value) return;
   TableRowPositionStatus.totalRows.value = dataStore.totalRows;
   TableRowPositionStatus.visibleRows.value = gridApi.value.getDisplayedRowCount();
-  TableRowPositionStatus.firstVisibleRow.value = gridApi.value.getFirstDisplayedRow() + 1;
-  TableRowPositionStatus.lastVisibleRow.value = gridApi.value.getLastDisplayedRow() + 1;
+  TableRowPositionStatus.firstVisibleRow.value = gridApi.value.getFirstDisplayedRowIndex() + 1;
+  TableRowPositionStatus.lastVisibleRow.value = gridApi.value.getLastDisplayedRowIndex() + 1;
   currentDisplayedRowsRange.value = `${TableRowPositionStatus.firstVisibleRow.value}-${TableRowPositionStatus.lastVisibleRow.value}`;
 };
 
@@ -578,11 +582,11 @@ const updateColumnDefs = () => {
     },
     ...baseColumns,
     ...collapsedDataExtractedColumns,
-    ...(totalExpandableRows.value > 0 ? [{ 
+    ...(totalExpandableRows.value > 0 ? [{
       field: ColumnManager.EXPANDABLE_DATA_COLUMN, 
+      cellDataType: 'text',
       headerName: 'Expandable Data', 
-      width: 300, 
-      cellRenderer: 'payloadCellRenderer',
+      cellRenderer: 'expandableCellRenderer',
       headerClass: 'my-ag-table-expandable-data-header',
       cellClass: 'my-ag-table-expandable-data-cell',
       cellRendererParams: cellRendererParams,
