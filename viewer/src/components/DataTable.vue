@@ -68,6 +68,8 @@
           <thead>
             <tr>
               <th>column</th>
+              <th>set X</th>
+              <th>set Y</th>
               <th>categorical</th>
               <th>time</th>
               <th>coerce to number</th>
@@ -84,7 +86,23 @@
             >
               <td
                 :style="(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value.has(column) || ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value.has(column)) ? Colorizer.makeTextContainerStyle(column) : null"
-              >{{ column }}</td>
+              >
+                {{ column }}
+              </td>
+              <td>
+                <label>
+                  <input type="radio" :checked="plotSettings.xColumn == column"
+                    @change="plotSettings.xColumn = column"
+                  />
+                </label>
+              </td>
+              <td>
+                <label>
+                  <input type="radio" :checked="plotSettings.yColumn == column"
+                    @change="plotSettings.yColumn = column"
+                  />
+                </label>
+              </td>
               <td>
                 <label>
                   <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(column)"
@@ -1002,12 +1020,27 @@ onMounted(() => {
 import * as Plotly from 'plotly.js-dist';
 const plotContainer = ref(null);
 
+interface PlotSettings {
+  xColumn: string | null;
+  yColumn: string | null;
+}
+const plotSettings = ref<PlotSettings>({
+  xColumn: null,
+  yColumn: null,
+});
+
 const togglePlot = (event: Event) => {
   const isChecked = (event.target as HTMLInputElement).checked;
   if(!isChecked) {
     return;
   }
 
+  if(plotSettings.value.xColumn == null || plotSettings.value.yColumn == null) {
+    alert("No plot settings");
+    return;
+  }
+
+  /*
   let timeColumnCandidate: string | null = null;
   for(const col of ColumnManager.ColumnTypeTracker.timeColumns.value) {
     if(rowData.value.every(row => row[col] != null)) {
@@ -1034,32 +1067,42 @@ const togglePlot = (event: Event) => {
     console.warn("No value column candidate found");
     return;
   }
+  */
 
   const X: any[] = [];
   const Y: any[] = [];
 
   for(const row of rowData.value) {
-    X.push(ColumnManager.parseTimeValue(row[timeColumnCandidate]));
-    Y.push(row[valueColumnCandidate]);
+    // SUPER DUPER RISKY AND DIRTY
+    X.push(ColumnManager.parseTimeValue(
+      row[plotSettings.value.xColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.xColumn]
+    ));
+    Y.push(
+      row[plotSettings.value.yColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.yColumn]
+    );
   }
-  new Plotly.newPlot(plotContainer.value, [{
+
+  const plot = new Plotly.newPlot(plotContainer.value, [{
     x: X,
     y: Y,
     type: 'scatter',
     mode: 'markers',
     marker: {
       size: 10,
+      color: 'rgba(17, 157, 255,0.5)',
       symbol: 'circle',
     },
   }], {
     xaxis: {
-      title: timeColumnCandidate,
+      title: plotSettings.value.xColumn,
       type: 'date'
     },
     yaxis: {
-      title: valueColumnCandidate
+      title: plotSettings.value.yColumn,
     }
   });
+
+  console.log(plot);
 }
 
 watch(
