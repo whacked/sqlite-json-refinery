@@ -61,48 +61,58 @@ export abstract class ContractableColumnsManager {
     public detectedKeys: Ref<Set<string>>;
     public hiddenKeys: Ref<Set<string>>;
 
-    abstract getVisibleKeys(): Array<string>;
-    abstract contractKey(key: string): void;
-    abstract hideKey(key: string): void;
-    abstract resetKeys(): void;
-    abstract clearAll(): void;
-
-    constructor() {
+    constructor(
+        public expandedRows: Ref<Set<number>>,
+        public expandedKeys: Ref<Set<string>>,
+        public collapsedKeys: Ref<Set<string>>,
+    ) {
         this.detectedKeys = ref(new Set<string>());
         this.hiddenKeys = ref(new Set<string>());
+    }
+
+    getVisibleKeys(): Array<string> {
+        return Array.from(this.expandedKeys.value)
+            .filter(key => !this.hiddenKeys.value.has(key));
+    }
+
+    contractKey(key: string): void {
+        this.expandedKeys.value.delete(key);
+        this.collapsedKeys.value.add(key);
+    }
+
+    hideKey(key: string): void {
+        this.hiddenKeys.value.add(key);
+        this.expandedKeys.value.delete(key);
+        this.collapsedKeys.value.delete(key);
+    }
+
+    resetKeys(): void {
+        this.expandedKeys.value.clear();
+        this.collapsedKeys.value = new Set(this.detectedKeys.value);
+    }
+
+    clearAll(): void {
+        this.detectedKeys.value.clear();
+        this.hiddenKeys.value.clear();
+        this.resetKeys();
     }
 }
 
 class ExpandableColumnsManager extends ContractableColumnsManager {
-    public expandedExpandableDataRows = ref(new Set<number>());
-    public expandedExpandableDataKeys = ref(new Set<string>());
-    public expandableDataUnexpandedKeys = ref(new Set<string>());
+    public expandedExpandableDataRows: Ref<Set<number>>;
+    public expandedExpandableDataKeys: Ref<Set<string>>;
+    public expandableDataUnexpandedKeys: Ref<Set<string>>;
 
-    getVisibleKeys(): Array<string> {
-        return Array.from(this.expandedExpandableDataKeys.value)
-            .filter(key => !this.hiddenKeys.value.has(key));
-    }
+    constructor() {
+        super(
+            ref(new Set<number>()),
+            ref(new Set<string>()),
+            ref(new Set<string>()),
+        );
 
-    contractKey(key: string) {
-        this.expandedExpandableDataKeys.value.delete(key);
-        this.expandableDataUnexpandedKeys.value.add(key);
-    }
-
-    hideKey(key: string) {
-        this.expandedExpandableDataKeys.value.delete(key);
-        this.expandableDataUnexpandedKeys.value.delete(key);
-        this.hiddenKeys.value.add(key);
-    }
-
-    resetKeys() {
-        this.expandedExpandableDataKeys.value.clear()
-        this.expandableDataUnexpandedKeys.value = new Set(this.detectedKeys.value);
-    }
-
-    clearAll() {
-        this.detectedKeys.value.clear();
-        this.hiddenKeys.value.clear();
-        this.resetKeys();
+        this.expandedExpandableDataRows = this.expandedRows;
+        this.expandedExpandableDataKeys = this.expandedKeys;
+        this.expandableDataUnexpandedKeys = this.collapsedKeys;
     }
 }
 
@@ -110,35 +120,20 @@ export const expandableDataManager = new ExpandableColumnsManager();
 
 
 class CollapsibleColumnsManager extends ContractableColumnsManager {
-    public collapsibleDataExpandedRows = ref(new Set<number>());
-    public collapsibleDataCollapsedKeys = ref(new Set<string>());
-    public collapsibleDataExpandedKeys = ref(new Set<string>());
+    public collapsibleDataExpandedRows: Ref<Set<number>>;
+    public collapsibleDataCollapsedKeys: Ref<Set<string>>;
+    public collapsibleDataExpandedKeys: Ref<Set<string>>;
 
-    getVisibleKeys(): Array<string> {
-        return Array.from(this.collapsibleDataExpandedKeys.value)
-            .filter(key => !this.hiddenKeys.value.has(key));
-    }
+    constructor() {
+        super(
+            ref(new Set<number>()),
+            ref(new Set<string>()),
+            ref(new Set<string>()),
+        );
 
-    contractKey(key: string) {
-        this.collapsibleDataExpandedKeys.value.delete(key);
-        this.collapsibleDataCollapsedKeys.value.add(key);
-    }
-
-    hideKey(key: string) {
-        this.collapsibleDataCollapsedKeys.value.delete(key);
-        this.collapsibleDataExpandedKeys.value.delete(key);
-        this.hiddenKeys.value.add(key);
-    }
-
-    resetKeys() {
-        this.collapsibleDataExpandedKeys.value.clear()
-        this.collapsibleDataCollapsedKeys.value = new Set(this.detectedKeys.value);
-    }
-
-    clearAll() {
-        this.detectedKeys.value.clear();
-        this.hiddenKeys.value.clear();
-        this.resetKeys();
+        this.collapsibleDataExpandedRows = this.expandedRows;
+        this.collapsibleDataCollapsedKeys = this.collapsedKeys;
+        this.collapsibleDataExpandedKeys = this.expandedKeys;
     }
 }
 
