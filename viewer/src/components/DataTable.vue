@@ -1,6 +1,6 @@
 <template>
   <div class="main-grid-container">
-    <div class="filters">
+    <div class="my-data-filters">
       <input v-model="quickFilterText" placeholder="Quick filter..." @input="onQuickFilterChanged" />
       <button @click="autoSizeColumns">Fit Columns</button>
     </div>
@@ -28,7 +28,7 @@
         </div>
       </details>
     </div>
-    <div class="ag-theme-alpine">
+    <div class="ag-grid-container ag-theme-alpine">
       <div>
         {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${dataStore.totalRows} rows visible
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
@@ -79,7 +79,7 @@
               v-for="column in (
                 Array.from(ColumnManager.coreDetectedKeys.value)
                   .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
-                .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
+                  .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
             )"
             >
               <td
@@ -110,6 +110,26 @@
                 <button @click="extractUnits(column)">extract units</button>
               </td>
             </tr>
+            <template
+              v-for="columnGroup in ColumnManager.ColumnTypeTracker.derivedColumnGroups.value"
+            >
+              <tr
+                v-for="(column, index) in columnGroup.derivedColumns"
+                :style="Colorizer.makeTextContainerStyle(columnGroup.originalColumn)"
+              >
+                <td
+                  :style="Colorizer.makeTextContainerStyle(column)"
+                >
+                  {{ column }}
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>
+                  <button v-if="index == 0" @click="underiveColumn(columnGroup)">restore</button>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -185,15 +205,28 @@
 </template>
 
 <style scoped>
-
+/* wtf, the ag styles are not getting applied from style.css */
 .main-grid-container {
   width: 100%;
   height: 80em;
   background: beige;
 }
 
-.ag-theme-alpine {
+.ag-grid-container {
   height: 60em;
+}
+
+.ag-theme-quartz {
+  /* this actually works but overall it's a mess */
+  --ag-header-background-color: #fff;
+  --ag-header-foreground-color: #333;
+  --ag-header-cell-hover-background-color: none;
+  --ag-header-cell-moving-background-color: rgb(180, 140, 140);
+
+  --ag-header-column-resize-handle-display: block;
+  --ag-header-column-resize-handle-height: 80%;
+  --ag-header-column-resize-handle-width: 2px;
+  --ag-header-column-resize-handle-color: orange;
 }
 
 .main-grid {
@@ -205,7 +238,7 @@
   display: inline-block;
 }
 
-.filters {
+.my-data-filters {
   margin-bottom: 10px;
 }
 
@@ -261,13 +294,9 @@ function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
       }, [
         ...(
           params.displayName.split('.').map((word: string, index: number) => {
-            const backgroundColor = colorHash.hex(word);
-            const isDark = chroma(backgroundColor).luminance() < 0.6;
-            const textColor = isDark ? 'white' : 'black';
-
             return h('span', {
               class: 'ag-header-cell-text',
-              style: { background: backgroundColor, color: textColor },
+              style: Colorizer.makeTextContainerStyle(word),
             }, index > 0 ? '.' + word : word)
           })
         ),
@@ -435,6 +464,32 @@ function coerceToNumber(value: string) {
   return parseFloat(value);
 }
 
+const underiveColumn = (columnGroup: ColumnManager.DerivedColumnGroup) => {
+  if(!gridApi.value) return;
+
+  const rowsToUpdate: any[] = [];
+  for(let i = 0; i < gridApi.value.getDisplayedRowCount(); ++i) {
+    const row = gridApi.value.getDisplayedRowAtIndex(i);
+    if (!row || !row.data) continue;
+
+    for(const column of columnGroup.derivedColumns) {
+      delete row.data[column];
+      rowsToUpdate.push(row.data);
+    }
+  }
+
+  gridApi.value?.applyTransaction({ update: rowsToUpdate });
+
+  if( columnGroup.isFromExpandedData ) {
+    expandableDataManager.unhideKey(columnGroup.originalColumn);
+  } else {
+    collapsibleDataManager.unhideKey(columnGroup.originalColumn);
+  }
+
+  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value = ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.filter(group => group.originalColumn !== columnGroup.originalColumn);
+  updateColumnDefs();
+}
+
 const extractUnits = async (column: string) => {
   if(!gridApi.value) return;
   function makeUnitColumn(unit: string) {
@@ -465,7 +520,7 @@ const extractUnits = async (column: string) => {
     }
 
     const parsedValue = ColumnManager.parseValueWithUnitSuffix(rowValue);
-    if (parsedValue.unit) {
+    if (parsedValue.unit != null) {
       const unitColumn = makeUnitColumn(parsedValue.unit);
       discoveredUnitColumns.add(unitColumn);
       row.data[unitColumn] = parsedValue.value;
@@ -652,6 +707,48 @@ const updateColumnDefs = () => {
       derivedColumns.push({
         field: col,
         headerName: col,
+        headerClass: group.isFromExpandedData ? 'my-ag-table-expandable-data-header' : 'my-ag-table-derived-from-expanded-data-header',
+        headerComponent: (
+          defineComponent({
+            props: ['displayName', 'onCustomAction'],
+            setup(props) {
+              //@ts-ignore  this is correct, but flagged by the linter
+              const params = props.params;
+              const sortOrder = ref(params.column.getSort());
+
+              /* this does NOT work */
+              const onSortClicked = (event: MouseEvent) => {
+                params.progressSort(event.shiftKey);
+                sortOrder.value = params.column.getSort();
+              };
+
+              params.column.addEventListener('sortChanged', () => {
+                sortOrder.value = params.column.getSort();
+              });
+
+              return () => h('div', {
+                class: 'ag-header-cell-label my-ag-table-expanded-column-header',
+              }, [
+                ...(
+                  (params.displayName as string).split('.').filter(w => w.length > 0).map((word: string, index: number) => {
+                    return h('span', {
+                      class: 'ag-header-cell-text',
+                      style: Colorizer.makeTextContainerStyle(word),
+                    }, index > 0 ? '.' + word : word)
+                  })
+                ),
+                /* sort button does not work */
+                /* h('button', {
+                  class: 'ag-my-sort-button',
+                  onClick: onSortClicked
+                }, (
+                  sortOrder.value === "asc" ? '▲' : 
+                  sortOrder.value === "desc" ? '▼' : '⇅'
+                )), */
+              ]);
+            }
+          })
+        ),
         valueFormatter: (params: ValueFormatterParams) => {
           return params.data[col];
         },

@@ -92,7 +92,7 @@ button:focus-visible {
 
   --ag-header-column-resize-handle-display: block;
   --ag-header-column-resize-handle-height: 25%;
-  --ag-header-column-resize-handle-width: 5px;
+  --ag-header-column-resize-handle-width: 15px;
   --ag-header-column-resize-handle-color: orange;
 }
 
@@ -167,6 +167,9 @@ button:focus-visible {
   border: 2px solid #ccc;
   color: #ccc;
 }
+.my-ag-table-derived-from-expanded-data-header {
+  border: 3px solid brown;
+}
 
 .my-ag-table-collapsible-data-cell button {
   border-color: #92400e;
@@ -201,6 +204,9 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+.my-ag-table-expandable-data-header {
+  border: 3px solid #0c4a6e;
 }
 .my-ag-table-expandable-data-header > div {
   display: flex;

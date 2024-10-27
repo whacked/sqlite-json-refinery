@@ -22,7 +22,7 @@ export function generateData(count: number) {
 
   console.log("fakeColumns", fakeColumns);
 
-  const randomCurrencies: string[] = [];
+  const randomCurrencies: string[] = [''];
   for (let i = 0; i < 5; ++i) {
     randomCurrencies.push(faker.finance.currencyCode());
   }
@@ -39,6 +39,7 @@ export function generateData(count: number) {
       // company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),
+      price: `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`,
       ...Object.fromEntries(fakeColumns.map(column => [column, faker.lorem.word()])),
     }
 

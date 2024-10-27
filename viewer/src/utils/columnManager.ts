@@ -15,6 +15,7 @@ export const COMMON_COLUMN_KEYS = ref(new Set<string>([
     'topic',
     'category',
     'entry',
+    /* 'price', */
 ]));
 
 export const SPECIAL_COLUMN_KEYS = new Set([
@@ -83,6 +84,12 @@ export abstract class ContractableColumnsManager {
     hideKey(key: string): void {
         this.hiddenKeys.value.add(key);
         this.expandedKeys.value.delete(key);
+        this.collapsedKeys.value.delete(key);
+    }
+
+    unhideKey(key: string): void {
+        this.hiddenKeys.value.delete(key);
+        this.expandedKeys.value.add(key);
         this.collapsedKeys.value.delete(key);
     }
 
