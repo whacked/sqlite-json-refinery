@@ -510,8 +510,8 @@ const underiveColumn = (columnGroup: ColumnManager.DerivedColumnGroup) => {
 
 const extractUnits = async (column: string) => {
   if(!gridApi.value) return;
-  function makeUnitColumn(unit: string) {
-    return `${column}.${unit}`;
+  function makeUnitColumn(columnPrefix: string, unit: string) {
+    return `${columnPrefix}.${unit}`;
   }
   const discoveredUnitColumns = new Set<string>();
   const trackIsFromExpandedData = new Set<boolean>();
@@ -520,26 +520,32 @@ const extractUnits = async (column: string) => {
     const row = gridApi.value.getDisplayedRowAtIndex(i);
     if (!row || !row.data) continue;
 
+    let rowValue: any;
     // use a primitive method to check if the value is in the original data map
     // or if it's an expandable-data value
-    const maybeInOriginalData = row.data[column];
-    const maybeInExpandedData = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column];
-    if(maybeInExpandedData === undefined && maybeInOriginalData === undefined) {
+    let expandedDataValue: any | null;
+    let maybeOriginalDataValue: any | null;
+    if (column.startsWith(ColumnManager.EXPANDABLE_DATA_COLUMN + '.')) {
+      expandedDataValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column.substring(ColumnManager.EXPANDABLE_DATA_COLUMN.length + 1)];
+    } else {
+      maybeOriginalDataValue = row.data[column];
+    }
+
+    if(expandedDataValue === undefined && maybeOriginalDataValue === undefined) {
       continue;
     }
 
-    let rowValue: any
-    if (maybeInOriginalData !== undefined) {
+    if (maybeOriginalDataValue !== undefined) {
       trackIsFromExpandedData.add(false);
-      rowValue = maybeInOriginalData;
+      rowValue = maybeOriginalDataValue;
     } else {
       trackIsFromExpandedData.add(true);
-      rowValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column];
+      rowValue = expandedDataValue;
     }
 
     const parsedValue = ColumnManager.parseValueWithUnitSuffix(rowValue);
     if (parsedValue.unit != null) {
-      const unitColumn = makeUnitColumn(parsedValue.unit);
+      const unitColumn = makeUnitColumn(column, parsedValue.unit);
       discoveredUnitColumns.add(unitColumn);
       row.data[unitColumn] = parsedValue.value;
       rowsToUpdate.push(row.data); 
@@ -591,8 +597,9 @@ const processRows = async () => {
       expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
       if (expandableData) {
         Object.keys(expandableData).forEach(key => {
-          expandableDataManager.detectedKeys.value.add(key);
-          expandableDataManager.expandableDataUnexpandedKeys.value.add(key);
+          const fullKey = ColumnManager.makeExpandableDataColumnKey(key);
+          expandableDataManager.detectedKeys.value.add(fullKey);
+          expandableDataManager.expandableDataUnexpandedKeys.value.add(fullKey);
         });
       }
     }
@@ -787,23 +794,28 @@ const updateColumnDefs = () => {
 
     const expandableDataExtractedColumns: ColDef[] = Array.from(expandableDataManager.getVisibleKeys())
     .sort((a, b) => a.localeCompare(b))
-    .map(key => ({
-      field: `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`,
-      headerName: key,
-      headerClass: 'my-ag-table-expandable-data-expanded-column',
-      cellClass: 'my-ag-table-expandable-data-expanded-cell',
-      headerComponent: expandedPayloadColumnHeader,
-       headerComponentParams: {
-        key: key,
-      },
-      valueFormatter: (params: ValueFormatterParams) => {
-        if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(key)) {
-          return coerceToNumber(params.value);
-        }
-        return params.value;
-      },
-      cellRenderer: selectRenderer(key).cellRenderer,
-    }));
+    .map(key => {
+      const fullKey = `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`
+        return {
+        field: fullKey,
+        headerName: key,
+        headerClass: 'my-ag-table-expandable-data-expanded-column',
+        cellClass: 'my-ag-table-expandable-data-expanded-cell',
+        headerComponent: expandedPayloadColumnHeader,
+        headerComponentParams: {
+          key: key,
+        },
+        valueFormatter: (params: ValueFormatterParams) => {
+          const subKey = key.substring(ColumnManager.EXPANDABLE_DATA_COLUMN.length + 1);
+          const value = params.data[ColumnManager.EXPANDABLE_DATA_COLUMN][subKey];
+          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(fullKey)) {
+            return coerceToNumber(value);
+          }
+          return value;
+        },
+        cellRenderer: selectRenderer(key).cellRenderer,
+      }
+    });
 
   columnDefs.value = [
     {
@@ -868,9 +880,9 @@ const toggleExpandExpandableKeys = (rowIndex: number) => {
     const row = rowData.value[rowIndex];
     if (row) {
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-          expandableDataManager.expandedExpandableDataKeys.value.add(key);
-          expandableDataManager.expandableDataUnexpandedKeys.value.delete(key);
+        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(fullKey => {
+          expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(fullKey));
+          expandableDataManager.expandableDataUnexpandedKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(fullKey));
         });
       }
     }
@@ -886,9 +898,9 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
     const row = rowData.value[rowIndex];
     if (row) {
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-          expandableDataManager.expandedExpandableDataKeys.value.delete(key);
-          expandableDataManager.expandableDataUnexpandedKeys.value.add(key);
+        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(fullKey => {
+          expandableDataManager.expandedExpandableDataKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(fullKey));
+          expandableDataManager.expandableDataUnexpandedKeys.value.add(ColumnManager.makeExpandableDataColumnKey(fullKey));
         });
       }
     }
@@ -960,7 +972,7 @@ const expandAllExpandableRows = () => {
       const payloadKeys = Object.keys(row.payload);
       if (payloadKeys.length > 0) {
         expandableDataManager.expandedExpandableDataRows.value.add(row.id);
-        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(key));
+        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key)));
         isDirty = true;
       }
     }

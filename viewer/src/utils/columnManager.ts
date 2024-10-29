@@ -6,6 +6,10 @@ export const EXPANDABLE_DATA_COLUMN_SHADOW = 'payloadString';
 export const COLLAPSABLE_DATA_COLUMN = 'collapsedData';
 export const COLLAPSABLE_DATA_COLUMN_SHADOW = 'collapsedDataString';
 
+export function makeExpandableDataColumnKey(key: string): string {
+    return `${EXPANDABLE_DATA_COLUMN}.${key}`;
+}
+
 export const COMMON_COLUMN_KEYS = ref(new Set<string>([
     'id',
     'country',
