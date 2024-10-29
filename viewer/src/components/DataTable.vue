@@ -87,7 +87,7 @@
               <td
                 :style="(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value.has(column) || ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value.has(column)) ? Colorizer.makeTextContainerStyle(column) : null"
               >
-                {{ column }}
+                <ColorizedNestedColumn :column="column" />
               </td>
               <td>
                 <label>
@@ -138,7 +138,7 @@
                 <td
                   :style="Colorizer.makeTextContainerStyle(column)"
                 >
-                  {{ column }}
+                  <ColorizedNestedColumn :column="column" />
                 </td>
                 <td></td>
                 <td></td>
@@ -272,10 +272,10 @@ import CollapsableCell from '@/components/CollapsableCell.vue';
 import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
 import { loadRemoteData } from '@/stores/remoteDataLoader';
-import chroma from 'chroma-js';
+import ColorizedNestedColumn from '@/components/ColorizedNestedColumn.vue';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
-import { colorHash, Colorizer } from './styling';
+import { Colorizer } from './styling';
 import { collapsibleDataManager, ContractableColumnsManager, expandableDataManager } from '@/utils/columnManager';
 
 
@@ -748,12 +748,9 @@ const updateColumnDefs = () => {
                 class: 'ag-header-cell-label my-ag-table-expanded-column-header',
               }, [
                 ...(
-                  (params.displayName as string).split('.').filter(w => w.length > 0).map((word: string, index: number) => {
-                    return h('span', {
-                      class: 'ag-header-cell-text',
-                      style: Colorizer.makeTextContainerStyle(word),
-                    }, index > 0 ? '.' + word : word)
-                  })
+                  [h(ColorizedNestedColumn, {
+                    column: params.displayName
+                  })]
                 ),
                 /* sort button does not work */
                 /* h('button', {
