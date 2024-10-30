@@ -34,33 +34,93 @@
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
         }}; {{ totalExpandableRows }} expandable rows
       </div>
-      <table>
+      <table class="data-keys-table">
         <tbody>
           <tr>
             <th>rows</th><td>{{ props.rowData.length }}</td>
           </tr>
 
-          <tr>
+          <tr class="expandable-data-keys">
             <th>expandable keys</th><td>{{ expandableDataManager.detectedKeys.value }}</td>
           </tr>
-          <tr>
+          <tr class="expandable-data-keys">
             <th>unexpanded keys</th><td>{{ expandableDataManager.expandableDataUnexpandedKeys.value }}</td>
           </tr>
-          <tr>
+          <tr class="expandable-data-keys">
             <th>expanded keys</th><td>{{ expandableDataManager.expandedExpandableDataKeys.value }}</td>
           </tr>
 
           <tr>
-            <th>collapsible keys</th><td>{{ collapsibleDataManager.detectedKeys.value }}</td>
-          </tr>
-          <tr>
-            <th>uncollapsed keys</th><td>{{ collapsibleDataManager.collapsibleDataExpandedKeys.value }}</td>
-          </tr>
-          <tr>
-            <th>collapsed keys</th><td>{{ collapsibleDataManager.collapsibleDataCollapsedKeys.value }}</td>
+            <th>column type tracker</th>
+            <td
+              @click="console.log(
+                'categorical',
+                ColumnManager.ColumnTypeTracker.categoricalColumns.value,
+                'time',
+                ColumnManager.ColumnTypeTracker.timeColumns.value,
+                'coerce to number',
+                ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value
+              )"
+            >
+              {{ ColumnManager.ColumnTypeTracker.categoricalColumns.value.size }} categorical, {{ ColumnManager.ColumnTypeTracker.timeColumns.value.size }} time, {{ ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.size }} coerce to number
+            </td>
           </tr>
         </tbody>
       </table>
+
+      <table>
+      <tbody style="font-size: 20pt;">
+
+            <tr>
+              <th>usable columns ({{ ColumnManager.UsableColumns.columnsSet.value.size }})</th>
+              <td>
+                <ul>
+                  <li
+                    v-for="col in Array.from(ColumnManager.UsableColumns.columnsSet.value)"
+                    :style="{ display: 'inline-block',
+                      marginRight: '10px',
+                      border: col.effectiveLookupPath.length == 1 ? '2px solid black' : '2px solid red',
+                    }"
+                  >
+                    {{ col.displayString }}
+                  </li>
+                </ul>
+              </td>
+            </tr>
+
+
+
+            <tr class="collapsible-data-keys">
+              <th>collapsible keys</th>
+              <td>
+                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
+                  return col.effectiveLookupPath.length == 1
+                }).map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+            <tr class="collapsible-data-keys">
+              <th>collapsed keys</th>
+              <td>
+                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
+                  return col.effectiveLookupPath.length == 1 && !col.shouldDisplay
+                }).map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+            <tr class="collapsible-data-keys">
+              <th>uncollapsed keys</th>
+              <td>
+                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
+                  return col.effectiveLookupPath.length == 1 && col.shouldDisplay
+                }).map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+
+
+
+        </tbody>
+      </table>
+
+
 
       <div>
         <summary>colorize columns</summary>
@@ -77,11 +137,12 @@
             </tr>
           </thead>
           <tbody>
+
             <tr
               v-for="column in (
-                Array.from(ColumnManager.coreDetectedKeys.value)
-                  .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
-                  .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
+                Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
+                  // .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
+                  // .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
             )"
             >
               <td
@@ -128,6 +189,8 @@
                 <button @click="extractUnits(column)">extract units</button>
               </td>
             </tr>
+
+
             <template
               v-for="columnGroup in ColumnManager.ColumnTypeTracker.derivedColumnGroups.value"
             >
@@ -175,7 +238,7 @@
         :infiniteInitialRowCount="infiniteInitialRowCount"
         :maxBlocksInCache="maxBlocksInCache"
         :rowBuffer="rowBuffer"
-        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
         @grid-ready="onGridReady"
         @model-updated="onModelUpdated"
         @first-data-rendered="onFirstDataRendered"
@@ -194,7 +257,7 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
-        :rowHeight="ColumnManager.COMMON_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
 
         colon-paginationPageSize="paginationPageSize"
 
@@ -260,6 +323,18 @@
   margin-bottom: 10px;
 }
 
+.data-keys-table {
+  font-size: 12pt;
+}
+
+.expandable-data-keys {
+  background: #d9eefb;
+}
+
+.collapsible-data-keys {
+  background: #fce8dc;
+}
+
 </style>
 
 <script setup lang="ts">
@@ -294,7 +369,7 @@ function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
 
       const collapseKey = () => {
         const keyToRemove = params.key;
-        columnsManager.contractKey(keyToRemove);
+        ColumnManager.UsableColumns.setDisplayOff([keyToRemove]);
         updateColumnDefs();
       };
 
@@ -393,16 +468,16 @@ const currentDisplayedRowsRange = ref('');
 
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
-  ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.detectedKeys.value)
-  .filter(key => (
-    key !== ColumnManager.EXPANDABLE_DATA_COLUMN
-  ))
-  // .filter(key => ColumnManager.COMMON_COLUMN_KEYS.value.has(key))
-  .map(key => ({ key, isEnabled: ColumnManager.COMMON_COLUMN_KEYS.value.has(key) }));
-  ColumnManager.availableColumns.value = [{
-    key: 'id',
-    isEnabled: true,
-  }];
+  // ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.detectedKeys.value)
+  // .filter(key => (
+  //   key !== ColumnManager.EXPANDABLE_DATA_COLUMN
+  // ))
+  // // .filter(key => ColumnManager.COMMON_COLUMN_KEYS.value.has(key))
+  // .map(key => ({ key, isEnabled: ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) }));
+  // ColumnManager.availableColumns.value = [{
+  //   key: 'id',
+  //   isEnabled: true,
+  // }];
   updateRowCount();
 };
 
@@ -423,30 +498,31 @@ const updateRowCount = () => {
 const newColumnName = ref('');
 
 const toggleCoreColumn = (column: string) => {
-  if (ColumnManager.COMMON_COLUMN_KEYS.value.has(column)) {
-    ColumnManager.COMMON_COLUMN_KEYS.value.delete(column);
+  if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(column)) {
+    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.delete(column);
   } else {
-    ColumnManager.COMMON_COLUMN_KEYS.value.add(column);
+    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.add(column);
   }
   updateColumnDefs();
 };
 
 const addCoreColumn = () => {
-  if (newColumnName.value && !ColumnManager.COMMON_COLUMN_KEYS.value.has(newColumnName.value)) {
-    ColumnManager.COMMON_COLUMN_KEYS.value.add(newColumnName.value);
+  if (newColumnName.value && !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(newColumnName.value)) {
+    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.add(newColumnName.value);
     newColumnName.value = ''; // Clear the input after adding
     updateColumnDefs();
   }
 };
 
 const removeColumnName = (column: string) => {
-  if (ColumnManager.COMMON_COLUMN_KEYS.value.has(column)) {
-    ColumnManager.COMMON_COLUMN_KEYS.value.delete(column);
+  if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(column)) {
+    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.delete(column);
     updateColumnDefs();
   }
 };
 
 const toggleColumnTracker = (column: string, tracker: Ref<Set<string>>) => {
+  console.log("TOGGLE", column, tracker.value);
   if (tracker.value.has(column)) {
     tracker.value.delete(column);
   } else {
@@ -525,8 +601,8 @@ const extractUnits = async (column: string) => {
     // or if it's an expandable-data value
     let expandedDataValue: any | null;
     let maybeOriginalDataValue: any | null;
-    if (column.startsWith(ColumnManager.EXPANDABLE_DATA_COLUMN + '.')) {
-      expandedDataValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[column.substring(ColumnManager.EXPANDABLE_DATA_COLUMN.length + 1)];
+    if (ColumnManager.isExpandableDataColumnKey(column)) {
+      expandedDataValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[ColumnManager.getExpandableDataColumnSubKey(column)];
     } else {
       maybeOriginalDataValue = row.data[column];
     }
@@ -577,16 +653,50 @@ const extractUnits = async (column: string) => {
 
 const totalExpandableRows = ref<number>(0)
 
-const processRows = async () => {
+const processRows = async () => {  // process the incoming data, derive columns etc
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
-  ColumnManager.coreDetectedKeys.value.clear();
+  ColumnManager.DEPRECATE_coreDetectedKeys.value.clear();
   collapsibleDataManager.clearAll();
   expandableDataManager.clearAll();
 
   rowData.value = sourceData.map(row => {
     Object.keys(row).forEach(key => {
-      if (ColumnManager.COMMON_COLUMN_KEYS.value.has(key)) {
-        ColumnManager.coreDetectedKeys.value.add(key);
+
+
+      if (key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
+
+        ColumnManager.UsableColumns.addColumn({
+          effectiveLookupPath: [key],
+          apparentLookupPath: key,
+          displayString: key,
+          shouldDisplay: false,
+        });
+
+      } else {
+
+        const expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
+        if (expandableData) {
+          Object.keys(expandableData).forEach(subKey => {
+            ColumnManager.UsableColumns.addColumn({
+              effectiveLookupPath: [ColumnManager.EXPANDABLE_DATA_COLUMN, subKey],
+              apparentLookupPath: subKey,
+              displayString: ColumnManager.makeExpandableDataColumnKey(subKey),
+              shouldDisplay: false,
+            });
+          });
+        }
+
+
+      }
+
+
+      if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key)) {
+        ColumnManager.DEPRECATE_coreDetectedKeys.value.add({
+          effectiveLookupPath: [key],
+          apparentLookupPath: key,
+          displayString: key,
+          shouldDisplay: true,
+        });
       } else if(key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
         collapsibleDataManager.detectedKeys.value.add(key);
       }
@@ -613,11 +723,12 @@ const processRows = async () => {
   });
   updateColumnDefs();
   updateRowCount();
+  console.log("processed rows");
 };
 
 const updateColumnDefs = () => {
   const cellRendererParams: ColumnManager.RenderParams = {
-    coreDisplayParams: ColumnManager.COMMON_COLUMN_KEYS.value,
+    coreDisplayParams: ColumnManager.CUSTOMARY_COLUMN_KEYS.value,
     expandableDataExtractedKeys: expandableDataManager.expandedExpandableDataKeys.value,
     collapsedDataKeys: collapsibleDataManager.collapsibleDataExpandedKeys.value,
     collapsibleDataHiddenKeys: collapsibleDataManager.hiddenKeys.value,
@@ -627,9 +738,10 @@ const updateColumnDefs = () => {
     expandableDataManager,
     collapsibleDataManager,
     toggleExpandCollapsibleKeys,
-    toggleContractCollapsibleKeys,
     toggleExpandExpandableKeys,
     toggleContractExpandableKeys,
+
+    currentRestoredKeys: new Set<string>(ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => col.shouldDisplay).map(col => col.effectiveLookupPath[0])),
   };
 
   const coreDisplayParamSettings: Record<string, ColDef> = {
@@ -647,7 +759,7 @@ const updateColumnDefs = () => {
     },
     [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
-      headerName: `Collapsed (${collapsibleDataManager.collapsibleDataCollapsedKeys.value.size}/${collapsibleDataManager.detectedKeys.value.size})`,
+      headerName: ColumnManager.UsableColumns.getTotalCollapsedCountString(),
       width: 200,
       headerClass: 'my-ag-table-collapsible-data-header',
       cellRenderer: 'extractedDataCellRenderer',
@@ -662,17 +774,17 @@ const updateColumnDefs = () => {
           return () => h('div', { class: 'my-ag-table-collapsible-data-header' }, [
             h('div', {}, [
               h('div', { class: 'ag-header-cell-text' },
-                collapsibleDataManager.collapsibleDataCollapsedKeys.value.size == 0 ? "" : params.displayName
+                ColumnManager.UsableColumns.getTotalHiddenSingleLevelColumns() == 0 ? "" : params.displayName
               ),
             ]),
             h('div', { class: 'button-container' }, [
               h('div', {}, [
-                collapsibleDataManager.collapsibleDataExpandedKeys.value.size > 0 && h('button', {
+                ColumnManager.UsableColumns.getTotalVisibleSingleLevelColumns() > 0 && h('button', {
                   class: 'ag-my collapse all',
                   title: 'Collapse all',
                   onClick: collapseAllCollapsibleRows
                 }, '◀'),
-                collapsibleDataManager.collapsibleDataCollapsedKeys.value.size > 0 && h('button', {
+                ColumnManager.UsableColumns.getTotalHiddenSingleLevelColumns() > 0 && h('button', {
                   class: 'ag-my expand all',
                   title: 'Expand all',
                   onClick: restoreAllCollapsedRows
@@ -713,7 +825,7 @@ const updateColumnDefs = () => {
   }
 
   const baseColumns: ColDef[] = (
-    Array.from(ColumnManager.coreDetectedKeys.value)
+    Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
     .concat([
       ColumnManager.COLLAPSABLE_DATA_COLUMN,
       // needed for filtering
@@ -778,17 +890,17 @@ const updateColumnDefs = () => {
     }
   }
 
-  const collapsedDataExtractedColumns: ColDef[] = Array.from(collapsibleDataManager.getVisibleKeys())
-    .sort((a, b) => a.localeCompare(b))
-    .map(key => ({
-      field: key,
-      headerName: `${key}`,
+  const collapsedDataExtractedColumns: ColDef[] = ColumnManager.UsableColumns.getAllSingleLevelColumns()
+    .filter(col => col.shouldDisplay)
+    .map(col => ({
+      field: col.effectiveLookupPath[0],
+      headerName: col.displayString,
       headerClass: 'my-ag-table-collapsible-data-expanded-column',
       cellClass: 'my-ag-table-collapsible-data-expanded-cell',
-      cellRenderer: selectRenderer(key).cellRenderer,
+      cellRenderer: selectRenderer(col.effectiveLookupPath[0]).cellRenderer,
       headerComponent: expandedCollapsibleDataColumnHeader,
       headerComponentParams: {
-        key: key,
+        key: col.effectiveLookupPath[0],
       },
     }));
 
@@ -806,9 +918,11 @@ const updateColumnDefs = () => {
           key: key,
         },
         valueFormatter: (params: ValueFormatterParams) => {
-          const subKey = key.substring(ColumnManager.EXPANDABLE_DATA_COLUMN.length + 1);
+          const subKey = ColumnManager.getExpandableDataColumnSubKey(key);
           const value = params.data[ColumnManager.EXPANDABLE_DATA_COLUMN][subKey];
+          console.log("CHECK KEY", key, subKey, fullKey);
           if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(fullKey)) {
+            console.log("COERCE", value);
             return coerceToNumber(value);
           }
           return value;
@@ -879,10 +993,12 @@ const toggleExpandExpandableKeys = (rowIndex: number) => {
     expandableDataManager.expandedExpandableDataRows.value.add(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
+
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(fullKey => {
-          expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(fullKey));
-          expandableDataManager.expandableDataUnexpandedKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(fullKey));
+        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
+
+          expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key));
+          expandableDataManager.expandableDataUnexpandedKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(key));
         });
       }
     }
@@ -898,9 +1014,9 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
     const row = rowData.value[rowIndex];
     if (row) {
       if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(fullKey => {
-          expandableDataManager.expandedExpandableDataKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(fullKey));
-          expandableDataManager.expandableDataUnexpandedKeys.value.add(ColumnManager.makeExpandableDataColumnKey(fullKey));
+        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
+          expandableDataManager.expandedExpandableDataKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(key));
+          expandableDataManager.expandableDataUnexpandedKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key));
         });
       }
     }
@@ -918,29 +1034,9 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
     if (row) {
       console.log("row", row);
       Object.keys(row).filter(
-        key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
+        key => !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
       ).forEach(key => {
-        console.log("adding key", key);
-        collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key)
-        collapsibleDataManager.collapsibleDataCollapsedKeys.value.delete(key);
-      });
-    }
-  }
-  updateColumnDefs();
-}
-
-const toggleContractCollapsibleKeys = (rowIndex: number) => {
-  if (!collapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
-    return;
-  } else {
-    collapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
-    const row = rowData.value[rowIndex];
-    if (row) {
-      Object.keys(row).filter(
-        key => (!ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key))
-      ).forEach(key => {
-        collapsibleDataManager.collapsibleDataExpandedKeys.value.delete(key);
-        collapsibleDataManager.collapsibleDataCollapsedKeys.value.add(key);
+        ColumnManager.UsableColumns.setDisplayOn([key]);
       });
     }
   }
@@ -948,19 +1044,27 @@ const toggleContractCollapsibleKeys = (rowIndex: number) => {
 }
 
 const restoreAllCollapsedRows = () => {
+
+  ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = true);
+
+
   rowData.value.forEach(row => {
     collapsibleDataManager.collapsibleDataExpandedRows.value.add(row.id);
-    Object.keys(row).filter(
-      key => !ColumnManager.COMMON_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
-    ).forEach(key => collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key));
+    // Object.keys(row).filter(
+    //   key => !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
+    // ).forEach(key => collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key));
   });
-  collapsibleDataManager.collapsibleDataCollapsedKeys.value.clear();
+  // collapsibleDataManager.collapsibleDataCollapsedKeys.value.clear();
   updateColumnDefs();
 };
 
 const collapseAllCollapsibleRows = () => {
-  collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
-  collapsibleDataManager.resetKeys();
+
+  ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = false);
+
+
+  // collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
+  // collapsibleDataManager.resetKeys();
   updateColumnDefs();
 };
 
@@ -972,7 +1076,7 @@ const expandAllExpandableRows = () => {
       const payloadKeys = Object.keys(row.payload);
       if (payloadKeys.length > 0) {
         expandableDataManager.expandedExpandableDataRows.value.add(row.id);
-        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key)));
+        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(key));
         isDirty = true;
       }
     }
@@ -1127,7 +1231,6 @@ const dataSource: IDatasource = {
   getRows: async (params) => {
     const { startRow, endRow, successCallback, failCallback } = params;
     
-    collapsibleDataManager.clearAll();
     expandableDataManager.clearAll();
 
     try {
@@ -1143,7 +1246,7 @@ const dataSource: IDatasource = {
       // when used as infinite datasource, it has problem
       for (const row of rows) {
         row.payload = JSON.parse(row.payload);
-        Object.keys(row.payload).forEach(key => collapsibleDataManager.detectedKeys.value.add(key));
+        // Object.keys(row.payload).forEach(key => collapsibleDataManager.detectedKeys.value.add(key));
       }
       
       // If this is the last block of data, pass the actual row count

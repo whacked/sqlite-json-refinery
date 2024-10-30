@@ -10,7 +10,15 @@ export function makeExpandableDataColumnKey(key: string): string {
     return `${EXPANDABLE_DATA_COLUMN}.${key}`;
 }
 
-export const COMMON_COLUMN_KEYS = ref(new Set<string>([
+export function isExpandableDataColumnKey(key: string): boolean {
+    return key.startsWith(EXPANDABLE_DATA_COLUMN + '.');
+}
+
+export function getExpandableDataColumnSubKey(key: string): string {
+    return key.substring(EXPANDABLE_DATA_COLUMN.length + 1);
+}
+
+export const CUSTOMARY_COLUMN_KEYS = ref(new Set<string>([
     'id',
     'country',
     'createdAt',
@@ -35,11 +43,81 @@ export interface DispalyableColumn {
     isEnabled: boolean;
 }
 
-export const coreDetectedKeys = ref<Set<string>>(new Set());
+
+export interface ColumnKey {
+    effectiveLookupPath: string[];  // the actual code-friendly lookup path
+    apparentLookupPath: string;  // the that the human uses to refer to the data
+    displayString: string;
+    shouldDisplay: boolean;
+}
+
+export namespace UsableColumns {
+    export const columnsSet = ref<Set<ColumnKey>>(new Set());
+
+    const stringifiedLookup = new Map<string, ColumnKey>();
+
+    export function reset() {
+        stringifiedLookup.clear();
+        columnsSet.value.clear();
+    }
+
+    export function getColumn(keyPath: string[]): ColumnKey | undefined {
+        return stringifiedLookup.get(JSON.stringify(keyPath));
+    }
+
+    export function setDisplayOn(keyPath: string[]) {
+        const column = getColumn(keyPath);
+        if (column) {
+            column.shouldDisplay = true;
+        }
+    }
+
+    export function setDisplayOff(keyPath: string[]) {
+        console.log("setDisplayOff", keyPath);
+        const column = getColumn(keyPath);
+        if (column) {
+            column.shouldDisplay = false;
+        }
+    }
+
+    export function getAllSingleLevelColumns(): ColumnKey[] {
+        return Array.from(columnsSet.value).filter(col => col.effectiveLookupPath.length == 1);
+    }
+
+    export function getTotalVisibleSingleLevelColumns(): number {
+        return Array.from(columnsSet.value).filter(col => col.effectiveLookupPath.length == 1 && col.shouldDisplay).length;
+    }
+
+    export function getTotalHiddenSingleLevelColumns(): number {
+        return getAllSingleLevelColumns().length - getTotalVisibleSingleLevelColumns();
+    }
+
+    export function getTotalCollapsedCountString(): string {
+        const totalColumns = getAllSingleLevelColumns().length;
+        const totalHiddenColumns = getTotalHiddenSingleLevelColumns();
+        return `Collapsed (${totalHiddenColumns}/${totalColumns})`;
+    }
+
+    export function getAllNestedDepthColumns(): ColumnKey[] {
+        return Array.from(columnsSet.value).filter(col => col.effectiveLookupPath.length > 1);
+    }
+
+    export function addColumn(columnKey: ColumnKey) {
+        const stringifiedEffectiveLookupPath = JSON.stringify(columnKey.effectiveLookupPath);
+        if (stringifiedLookup.has(stringifiedEffectiveLookupPath)) {
+            return;
+        }
+        stringifiedLookup.set(stringifiedEffectiveLookupPath, columnKey);
+        columnsSet.value.add(columnKey);
+    }
+}
+
+
+export const DEPRECATE_coreDetectedKeys = ref<Set<ColumnKey>>(new Set());
 export const availableColumns = ref<DispalyableColumn[]>(
     ([] as DispalyableColumn[])
         .concat(
-            Array.from(COMMON_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
+            Array.from(CUSTOMARY_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
         )
     /* .concat(
         Array.from(SPECIAL_COLUMN_KEYS).map(key => ({ key, isEnabled: true }))
@@ -166,9 +244,10 @@ export interface RenderParams {
     collapsibleDataManager: CollapsibleColumnsManager;
 
     toggleExpandCollapsibleKeys: (rowIndex: number) => void;
-    toggleContractCollapsibleKeys: (rowIndex: number) => void;
     toggleExpandExpandableKeys: (rowIndex: number) => void;
     toggleContractExpandableKeys: (rowIndex: number) => void;
+
+    currentRestoredKeys: Set<string>;
 }
 
 export function objectWithoutKeys<T>(obj: T, keySource: object | string[] | Set<string>): T {

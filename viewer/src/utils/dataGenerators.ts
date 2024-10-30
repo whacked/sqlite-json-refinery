@@ -32,6 +32,7 @@ export function generateData(count: number) {
 
   return Array.from({ length: count }, () => {
     const sharedShapeData = {
+      /*
       id: faker.string.uuid(),
       // .person.fullName(),
       // email: faker.internet.email(),
@@ -39,12 +40,15 @@ export function generateData(count: number) {
       // company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),
+      */
       price: `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`,
+      temperature: Math.random() > 0.5 ? `${Math.floor(Math.random() * 100)}.` : Math.random(),
       ...Object.fromEntries(fakeColumns.map(column => [column, faker.lorem.word()])),
     }
 
-    const extraData: { [key: string]: any } = {}
-    extraData["quantity"] = `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`
+    const expandablePayloadStringData: { [key: string]: any } = {}
+    expandablePayloadStringData["price"] = `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`
+    expandablePayloadStringData["quantity"] = Math.random() > 0.05 ? `${Math.floor(Math.random() * 100)}p` : null
 
     /* const numberOfExtraColumns = Math.floor(Math.random() * 30) + 1 */
     const numberOfExtraColumns = 4
@@ -53,7 +57,7 @@ export function generateData(count: number) {
         continue;
       }
       const columnName = `e-${i}`;
-      extraData[columnName] = faker.lorem.word()
+      expandablePayloadStringData[columnName] = faker.lorem.word()
     }
 
     const extraNonPayloadData: { [key: string]: any } = {}
@@ -65,6 +69,6 @@ export function generateData(count: number) {
       extraNonPayloadData[columnName] = faker.animal.type()
     }
 
-    return { ...sharedShapeData, payload: JSON.stringify(extraData), ...extraNonPayloadData }
+    return { ...sharedShapeData, payload: JSON.stringify(expandablePayloadStringData), ...extraNonPayloadData }
   })
 }

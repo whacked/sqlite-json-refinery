@@ -24,10 +24,9 @@ const collapsedData = computed(() => {
     const subsetData = ColumnManager.objectWithoutKeys(
         props.params.data,
         new Set([
-            ...ColumnManager.COMMON_COLUMN_KEYS.value,
+            ...ColumnManager.CUSTOMARY_COLUMN_KEYS.value,
             ...ColumnManager.SPECIAL_COLUMN_KEYS,
-            ...collapsibleDataManager.collapsibleDataExpandedKeys.value,
-            ...collapsibleDataManager.hiddenKeys.value,
+            ...props.params.currentRestoredKeys,
         ])
     );
     const keyCount = Object.keys(subsetData).length;
