@@ -4,30 +4,6 @@
       <input v-model="quickFilterText" placeholder="Quick filter..." @input="onQuickFilterChanged" />
       <button @click="autoSizeColumns">Fit Columns</button>
     </div>
-    <div class="core-columns-control">
-      <details>
-        <summary>Core Columns</summary>
-        <div class="add-column">
-          <input v-model="newColumnName" placeholder="New column name" />
-          <button
-            v-if="newColumnName != '' && ColumnManager.availableColumns.value.filter(col => col.key == newColumnName).length > 0"
-            @click="addCoreColumn">Add Column {{ newColumnName }}</button>
-        </div>
-        <div
-          v-for="column in ColumnManager.availableColumns.value.sort((a, b) => a.key.localeCompare(b.key))"
-          :key="column.key" class="column-checkbox"
-        >
-          <label v-if="newColumnName == '' || column.key.includes(newColumnName)">
-            <input 
-              type="checkbox" 
-              :checked="column.isEnabled" 
-              @change="toggleCoreColumn(column.key)"
-            />
-            {{ column.key }}
-          </label>
-        </div>
-      </details>
-    </div>
     <div class="ag-grid-container ag-theme-alpine">
       <div>
         {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${dataStore.totalRows} rows visible
@@ -75,6 +51,7 @@
                       border: col.effectiveLookupPath.length == 1 ? '2px solid black' : '2px solid red',
                       background: col.shouldDisplay ? 'lightgreen' : 'lightgray',
                     }"
+                    @click="toggleColumnShouldDisplay(col)"
                   >
                     {{ col.displayString }}
                   </li>
@@ -123,16 +100,13 @@
               </td>
             </tr>
 
-
-
-
         </tbody>
       </table>
 
-
-
-      <div>
-        <summary>colorize columns</summary>
+      <details>
+        <summary>
+          column settings
+        </summary>
         <table>
           <thead>
             <tr>
@@ -207,7 +181,10 @@
             </tr>
 
             <template
-              v-for="(derivedColumn, index) in Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.derivedFromColumn != null)"
+              v-for="(derivedColumn, index) in Array.from(ColumnManager.UsableColumns.columnsSet.value)
+              .filter(col => col.derivedFromColumn != null)
+              .sort((a, b) => a.displayString.localeCompare(b.displayString))
+              "
             >
               <tr
                 :style="Colorizer.makeTextContainerStyle(derivedColumn.derivedFromColumn!.effectiveLookupPath.join('.'))"
@@ -223,14 +200,14 @@
                 <td></td>
                 <td></td>
                 <td>
-                  <button v-if="derivedColumn.displayString == derivedColumn.derivedFromColumn!.displayString + '.'" @click="underiveColumn(derivedColumn)">restore</button>
+                  <button @click="underiveColumn(derivedColumn)">restore</button>
                 </td>
               </tr>
             </template>
 
           </tbody>
         </table>
-      </div>
+      </details>
 
       <!--
       NOTE: rowModelType: infinite is not supported with rowData;
@@ -250,6 +227,8 @@
 
         :x-datasource="rowData.length > 0 ? dataSource : null"
         :rowData="rowData"
+
+        @keydown="onKeyDown"
 
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
@@ -376,67 +355,6 @@ const props = defineProps<{
 }>();
 
 
-function makeExpandedColumnHeader() {
-  return defineComponent({
-    props: ['displayName', 'onCustomAction'],
-    setup(props) {
-      //@ts-ignore  this is correct, but flagged by the linter
-      const params = props.params;
-      const sortOrder = ref(params.column.getSort());
-
-      const collapseKey = () => {
-        ColumnManager.UsableColumns.setDisplayOff([params.key]);
-        updateColumnDefs();
-      };
-
-      const onSortClicked = (event: MouseEvent) => {
-        params.progressSort(event.shiftKey);
-        sortOrder.value = params.column.getSort();
-      };
-
-      params.column.addEventListener('sortChanged', () => {
-        sortOrder.value = params.column.getSort();
-      });
-
-      return () => h('div', {
-        class: 'ag-header-cell-label my-ag-table-expanded-column-header',
-      }, [
-        ...(
-          params.displayName.split('.').map((word: string, index: number) => {
-            return h('span', {
-              class: 'ag-header-cell-text',
-              style: Colorizer.makeTextContainerStyle(word),
-            }, index > 0 ? '.' + word : word)
-          })
-        ),
-        h('button', {
-          class: 'ag-my-sort-button',
-          onClick: onSortClicked
-        }, (
-          sortOrder.value === "asc" ? '▲' : 
-          sortOrder.value === "desc" ? '▼' : '⇅'
-        )),
-        h('button', {
-          class: 'ag-my-collapse-button',
-          onClick: collapseKey
-        }, '✖'),
-      ]);
-    }
-  })
-}
-
-const expandableCollapsibleDataColumnHeader = makeExpandedColumnHeader();
-
-const components = {
-  expandedPayloadColumnHeader: expandableCollapsibleDataColumnHeader,
-  expandedExtraDataColumnHeader: expandableCollapsibleDataColumnHeader,
-  expandableCellRenderer: ExpandableCell,
-  extractedDataCellRenderer: CollapsableCell,
-  photoCellRenderer: PhotoCell,
-  timeCellRenderer: TimeCell,
-  colorizedCategoricalCellRenderer: ColorizedCategoricalCell,
-};
-
 const dataStore = useDataStore();
 
 const columnDefs = ref<ColDef[]>([]);
@@ -473,6 +391,7 @@ const onKeyDown = (event: KeyboardEvent) => {
         // Retrieve the cell value from the displayed row
         const cellValue = displayedRow.data[colId] ?? JSON.stringify(displayedRow.data);
         navigator.clipboard.writeText(cellValue);
+        console.log(displayedRow);
       }
     }
   }
@@ -483,20 +402,7 @@ const currentDisplayedRowsRange = ref('');
 
 const onModelUpdated = () => {
   console.log("%cupdated", "color: red; font-weight: bold; font-size: 2em;");
-  // ColumnManager.availableColumns.value = Array.from(collapsibleDataManager.detectedKeys.value)
-  // .filter(key => (
-  //   key !== ColumnManager.EXPANDABLE_DATA_COLUMN
-  // ))
-  // // .filter(key => ColumnManager.COMMON_COLUMN_KEYS.value.has(key))
-  // .map(key => ({ key, isEnabled: ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) }));
-  // ColumnManager.availableColumns.value = [{
-  //   key: 'id',
-  //   isEnabled: true,
-  // }];
   updateRowCount();
-
-
-  autoSizeColumns();
 };
 
 const onFirstDataRendered = () => {
@@ -514,15 +420,6 @@ const updateRowCount = () => {
 
 
 const newColumnName = ref('');
-
-const toggleCoreColumn = (column: string) => {
-  if (ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(column)) {
-    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.delete(column);
-  } else {
-    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.add(column);
-  }
-  updateColumnDefs();
-};
 
 const addCoreColumn = () => {
   if (newColumnName.value && !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(newColumnName.value)) {
@@ -548,6 +445,11 @@ const toggleColumnTracker = (column: string, tracker: Ref<Set<string>>) => {
   }
   updateColumnDefs();
 };
+
+const toggleColumnShouldDisplay = (column: ColumnManager.ColumnKey) => {
+  column.shouldDisplay = !column.shouldDisplay;
+  updateColumnDefs();
+}
 
 const toggleColumnTransformation = (column: ColumnManager.ColumnKey, transformation: ColumnTransformation) => {
   if (column.transformations?.includes(transformation)) {
@@ -602,7 +504,6 @@ const underiveColumn = (derivedColumn: ColumnManager.ColumnKey) => {
   .filter(col => {
     if(col.derivedFromColumn == sourceColumn) {
       ColumnManager.UsableColumns.removeColumn(col);
-      console.log("removed", col.apparentLookupPath);
       return true;
     }
     return false;
@@ -664,7 +565,6 @@ const extractUnits = async (column: ColumnManager.ColumnKey) => {
     if (parsedValue.unit != null) {
       discoveredUnitColumn = makeUnitColumn(column.apparentLookupPath, parsedValue.unit);
       discoveredUnitColumns.add(discoveredUnitColumn);
-      row.data[discoveredUnitColumn] = parsedValue.value;
       rowsToUpdate.push(row.data);
 
       const derivedColumnLookupPath: string[] = [
@@ -672,10 +572,12 @@ const extractUnits = async (column: ColumnManager.ColumnKey) => {
         discoveredUnitColumn,
       ]
 
+      const apparentLookupPath = derivedColumnLookupPath.join('.');
+      row.data[apparentLookupPath] = parsedValue.value;
       ColumnManager.UsableColumns.addColumn({
         effectiveLookupPath: derivedColumnLookupPath,
-        apparentLookupPath: discoveredUnitColumn,
-        displayString: discoveredUnitColumn,
+        apparentLookupPath: derivedColumnLookupPath.join('.'),
+        displayString: apparentLookupPath,
         shouldDisplay: true,
         serializedEffectiveLookupPath: JSON.stringify(derivedColumnLookupPath),
         derivedFromColumn: column,
@@ -706,12 +608,21 @@ const processRows = async () => {  // process the incoming data, derive columns 
 
       if (key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
 
+        let renderType: ColumnRendererType | null = null;
+
+        if (ColumnManager.DEFAULT_TIME_COLUMN_KEYS.has(key)) {
+          renderType = ColumnRendererType.TIME;
+        } else if (ColumnManager.DEFAULT_CATEGORICAL_COLUMN_KEYS.has(key)) {
+          renderType = ColumnRendererType.CATEGORICAL;
+        }
+
         ColumnManager.UsableColumns.addColumn({
           effectiveLookupPath: [key],
           apparentLookupPath: key,
           displayString: key,
-          shouldDisplay: false,
+          shouldDisplay: ColumnManager.CUSTOMARY_COLUMN_KEYS.has(key),
           serializedEffectiveLookupPath: JSON.stringify([key]),
+          renderType,
         });
 
       } else {
@@ -763,6 +674,67 @@ const processRows = async () => {  // process the incoming data, derive columns 
   updateColumnDefs();
   updateRowCount();
   console.log("processed rows");
+};
+
+function makeExpandedColumnHeader() {
+  return defineComponent({
+    props: ['displayName', 'onCustomAction'],
+    setup(props) {
+      //@ts-ignore  this is correct, but flagged by the linter
+      const params = props.params;
+      const sortOrder = ref(params.column.getSort());
+
+      const collapseKey = () => {
+        ColumnManager.UsableColumns.setDisplayOff([params.key]);
+        updateColumnDefs();
+      };
+
+      const onSortClicked = (event: MouseEvent) => {
+        params.progressSort(event.shiftKey);
+        sortOrder.value = params.column.getSort();
+      };
+
+      params.column.addEventListener('sortChanged', () => {
+        sortOrder.value = params.column.getSort();
+      });
+
+      return () => h('div', {
+        class: 'ag-header-cell-label my-ag-table-expanded-column-header',
+      }, [
+        ...(
+          params.displayName.split('.').map((word: string, index: number) => {
+            return h('span', {
+              class: 'ag-header-cell-text',
+              style: Colorizer.makeTextContainerStyle(word),
+            }, index > 0 ? '.' + word : word)
+          })
+        ),
+        h('button', {
+          class: 'ag-my-sort-button',
+          onClick: onSortClicked
+        }, (
+          sortOrder.value === "asc" ? '▲' : 
+          sortOrder.value === "desc" ? '▼' : '⇅'
+        )),
+        h('button', {
+          class: 'ag-my-collapse-button',
+          onClick: collapseKey
+        }, '✖'),
+      ]);
+    }
+  })
+}
+
+const expandableCollapsibleDataColumnHeader = makeExpandedColumnHeader();
+
+const components = {
+  expandedPayloadColumnHeader: expandableCollapsibleDataColumnHeader,
+  expandedExtraDataColumnHeader: expandableCollapsibleDataColumnHeader,
+  expandableCellRenderer: ExpandableCell,
+  extractedDataCellRenderer: CollapsableCell,
+  photoCellRenderer: PhotoCell,
+  timeCellRenderer: TimeCell,
+  colorizedCategoricalCellRenderer: ColorizedCategoricalCell,
 };
 
 const updateColumnDefs = () => {
@@ -819,12 +791,12 @@ const updateColumnDefs = () => {
             h('div', { class: 'button-container' }, [
               h('div', {}, [
                 ColumnManager.UsableColumns.getTotalVisibleSingleLevelColumns() > 0 && h('button', {
-                  class: 'ag-my collapse all',
+                  class: 'ag-my-collapse-all',
                   title: 'Collapse all',
                   onClick: collapseAllCollapsibleRows
                 }, '◀'),
                 ColumnManager.UsableColumns.getTotalHiddenSingleLevelColumns() > 0 && h('button', {
-                  class: 'ag-my expand all',
+                  class: 'ag-my-expand-all',
                   title: 'Expand all',
                   onClick: restoreAllCollapsedRows
                 }, '▶'),
@@ -857,13 +829,6 @@ const updateColumnDefs = () => {
         cellRenderer: 'colorizedCategoricalCellRenderer',
       }
     } else {
-      // console.log("coreDisplayParamSettings", nativePath, serializedPath);
-      // console.log("==>", coreDisplayParamSettings[nativePath])
-      // console.log("==>", {
-      //   field: nativePath,
-      //   headerName: humanReadablePath ?? serializedPath,
-      //   cellRenderer: null,
-      // })
       return coreDisplayParamSettings[nativePath] ?? {
         field: nativePath,
         headerName: humanReadablePath ?? serializedPath,
@@ -875,10 +840,7 @@ const updateColumnDefs = () => {
   const baseColumns: ColDef[] = (
     Array.from(ColumnManager.UsableColumns.getAllSingleLevelColumns())
     .filter(col => {
-      console.log("col", col.serializedEffectiveLookupPath, ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath));
-      return ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)
-      // return col.apparentLookupPath != ColumnManager.EXPANDABLE_DATA_COLUMN
-      // && col.apparentLookupPath != ColumnManager.COLLAPSABLE_DATA_COLUMN
+      return col.shouldDisplay && ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)
     })
     .map(col => {
       return selectRenderer(col);
@@ -948,13 +910,17 @@ const updateColumnDefs = () => {
           key: colKey,
         },
         valueFormatter: (params: ValueFormatterParams) => {
-          // WARN: assuming 1 level of nesting for now
-          // WARN: the ?? part is _probably_ when the expanded data is visible
-          const value = params.data?.[ColumnManager.EXPANDABLE_DATA_COLUMN][colKey.serializedEffectiveLookupPath] ?? params.value?.[colKey.apparentLookupPath];
-          if (colKey.transformations?.includes(ColumnTransformation.NUMBER)) {
-            return coerceToNumber(value) ?? "";
+          if (colKey.derivedFromColumn != null) {
+            return params.data[colKey.apparentLookupPath] ?? "";
+          } else {
+            // WARN: assuming 1 level of nesting for now
+            // WARN: the ?? part is _probably_ when the expanded data is visible
+            const value = params.data?.[ColumnManager.EXPANDABLE_DATA_COLUMN][colKey.serializedEffectiveLookupPath] ?? params.value?.[colKey.apparentLookupPath];
+            if (colKey.transformations?.includes(ColumnTransformation.NUMBER)) {
+              return coerceToNumber(value) ?? "";
+            }
+            return value ?? "";
           }
-          return value ?? "";
         },
         cellRenderer: selectRenderer(colKey).cellRenderer,
       }
@@ -994,12 +960,12 @@ const updateColumnDefs = () => {
             h('div', { class: 'button-container' }, [
               h('div', {}, [
                 ColumnManager.UsableColumns.getTotalVisibleNestedDepthColumns() > 0 && h('button', {
-                  class: 'ag-my collapse all',
+                  class: 'ag-my-collapse-all',
                   title: 'Collapse all',
                   onClick: contractAllExpandableRows
                 }, '◀'),
                 ColumnManager.UsableColumns.getTotalHiddenNestedDepthColumns() > 0 && h('button', {
-                  class: 'ag-my expand all',
+                  class: 'ag-my-expand-all',
                   title: 'Expand all',
                   onClick: expandAllExpandableRows
                 }, '▶'),

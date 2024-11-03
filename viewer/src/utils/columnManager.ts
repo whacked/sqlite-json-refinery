@@ -56,6 +56,9 @@ export enum ColumnRendererType {
     CATEGORICAL,
 }
 
+export const DEFAULT_TIME_COLUMN_KEYS = new Set(['time', 'timestamp', 'createdAt', 'updatedAt']);
+export const DEFAULT_CATEGORICAL_COLUMN_KEYS = new Set(['v', 'topic']);
+
 export interface ColumnKey {
     effectiveLookupPath: string[];  // the actual code-friendly lookup path
     apparentLookupPath: string;  // the that the human uses to refer to the data
@@ -147,9 +150,19 @@ export namespace UsableColumns {
     }
 
     export function getTotalCollapsedCountString(): string {
-        const totalColumns = getAllSingleLevelColumns().length;
-        const totalHiddenColumns = getTotalHiddenSingleLevelColumns();
-        return `Collapsed (${totalHiddenColumns}/${totalColumns})`;
+        let totalColumns = 0;
+        let totalHiddenColumns = 0;
+        for (const column of columnsSet.value) {
+            if (column.effectiveLookupPath.length == 1
+                && !CUSTOMARY_COLUMN_KEYS.has(column.apparentLookupPath)
+            ) {
+                totalColumns++;
+                if (!column.shouldDisplay) {
+                    totalHiddenColumns++;
+                }
+            }
+        }
+        return `Collapsed (${totalHiddenColumns}/${totalHiddenColumns})`;
     }
 
     export function getAllNestedDepthColumns(): ColumnKey[] {
@@ -171,18 +184,6 @@ export namespace UsableColumns {
         columnsSet.value.delete(columnKey);
     }
 }
-
-
-export const availableColumns = ref<DispalyableColumn[]>(
-    ([] as DispalyableColumn[])
-        .concat(
-            Array.from(SERIALIZED_CUSTOMARY_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
-        )
-    /* .concat(
-        Array.from(SPECIAL_COLUMN_KEYS).map(key => ({ key, isEnabled: true }))
-    ) */
-);
-
 
 export const collapsibleDataExpandedRows: Ref<Set<number>> = ref(new Set<number>());
 export const expandableDataExpandedRows: Ref<Set<number>> = ref(new Set<number>());

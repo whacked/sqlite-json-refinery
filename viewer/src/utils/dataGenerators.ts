@@ -36,9 +36,9 @@ export function generateData(count: number) {
       //*
       id: faker.string.uuid(),
       // .person.fullName(),
-      // email: faker.internet.email(),
-      // phone: faker.phone.number(),
-      // company: faker.company.name(),
+      email: faker.internet.email(),
+      phone: faker.phone.number(),
+      company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),
       // */
@@ -54,7 +54,6 @@ export function generateData(count: number) {
     /* const numberOfExtraColumns = Math.floor(Math.random() * 30) + 1 */
     const numberOfExtraColumns = 4
     for (let i = 0; i < numberOfExtraColumns; i++) {
-      break;
       if (Math.random() < 0.6) {
         continue;
       }
@@ -63,10 +62,8 @@ export function generateData(count: number) {
     }
 
     const extraNonPayloadData: { [key: string]: any } = {
-      "foo": `${Math.random() * 100}x`,
     }
     for (let i = 0; i < 4; ++i) {
-      break;
       if (Math.random() < 0.5) {
         continue;
       }
@@ -74,6 +71,6 @@ export function generateData(count: number) {
       extraNonPayloadData[columnName] = faker.animal.type()
     }
 
-    return { ...sharedShapeData, /* payload: JSON.stringify(expandablePayloadStringData), */ /* ...extraNonPayloadData */ }
+    return { ...sharedShapeData, payload: JSON.stringify(expandablePayloadStringData), ...extraNonPayloadData }
   })
 }
