@@ -159,7 +159,10 @@
                   ColumnManager.UsableColumns.getAllNestedDepthColumns().filter(
                     col => (col.shouldDisplay && JSON.stringify(col.effectiveLookupPath) == JSON.stringify(column.effectiveLookupPath))
                   ).length > 0
-                || ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => (col.shouldDisplay && col.effectiveLookupPath[0] == column.apparentLookupPath)).length > 0) ? Colorizer.makeTextContainerStyle(column) : null"
+                || ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => 
+                    (col.shouldDisplay && col.effectiveLookupPath[0] == column.apparentLookupPath)
+                  ).length > 0
+                ) ? Colorizer.makeTextContainerStyle(column.apparentLookupPath) : null"
               >
                 <ColorizedNestedColumn :columnText="column.displayString" />
               </td>
@@ -178,25 +181,25 @@
                 </label>
               </td>
               <td>
-                <label>
-                  <input type="checkbox" :checked="column.renderType == ColumnRendererType.CATEGORICAL"
-                    @change="toggleColumnRendererType(column, ColumnRendererType.CATEGORICAL)"
-                  />
-                </label>
+                <div class="emoji-toggle" @click="toggleColumnRendererType(column, ColumnRendererType.CATEGORICAL)">
+                  <span :class="column.renderType == ColumnRendererType.CATEGORICAL ? 'checked' : 'unchecked'">
+                    🛍️
+                  </span>
+                </div>
               </td>
               <td>
-                <label>
-                  <input type="checkbox" :checked="column.renderType == ColumnRendererType.TIME"
-                    @change="toggleColumnRendererType(column, ColumnRendererType.TIME)"
-                  />
-                </label>
+                <div class="emoji-toggle" @click="toggleColumnRendererType(column, ColumnRendererType.TIME)">
+                  <span :class="column.renderType == ColumnRendererType.TIME ? 'checked' : 'unchecked'">
+                    🕒
+                  </span>
+                </div>
               </td>
               <td>
-                <label>
-                  <input type="checkbox" :checked="column.transformations?.includes(ColumnTransformation.NUMBER)"
-                    @change="toggleColumnTransformation(column, ColumnTransformation.NUMBER)"
-                  />
-                </label>
+                <div class="emoji-toggle" @click="toggleColumnTransformation(column, ColumnTransformation.NUMBER)">
+                  <span :class="column.transformations?.includes(ColumnTransformation.NUMBER) ? 'checked' : 'unchecked'">
+                    🔢
+                  </span>
+                </div>
               </td>
               <td>
                 <button @click="extractUnits(column)">extract units</button>
@@ -556,7 +559,11 @@ const toggleColumnTransformation = (column: ColumnManager.ColumnKey, transformat
 }
 
 const toggleColumnRendererType = (column: ColumnManager.ColumnKey, rendererType: ColumnRendererType) => {
-  column.renderType = rendererType;
+  if(column.renderType == rendererType) { 
+    column.renderType = null;
+  } else {
+    column.renderType = rendererType;
+  }
   updateColumnDefs();
 }
 
