@@ -44,20 +44,12 @@
 
           <tr>
             <th>column type tracker</th>
-            <td
-              @click="console.log(
-                'categorical',
-                ColumnManager.ColumnTypeTracker.categoricalColumns.value,
-                'time',
-                ColumnManager.ColumnTypeTracker.timeColumns.value,
-                'coerce to number',
-                ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value
-              )"
-            >
+            <td>
               <ul>
-                <li>{{ ColumnManager.ColumnTypeTracker.categoricalColumns.value.size }} categorical</li>
-                <li>{{ ColumnManager.ColumnTypeTracker.timeColumns.value.size }} time</li>
-                <li>{{ ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.size }} coerce to number</li>
+                <li>{{ ColumnManager.UsableColumns.getTotalSpeciallyRenderedColumns(ColumnRendererType.CATEGORICAL) }} categorical</li>
+                <li>{{ ColumnManager.UsableColumns.getTotalTransformedColumns(ColumnTransformation.NUMBER) }} coerce to number</li>
+                <li>{{ ColumnManager.UsableColumns.getTotalSpeciallyRenderedColumns(ColumnRendererType.TIME) }} time</li>
+
                 <li>{{ ColumnManager.UsableColumns.columnsSet.value.size }} total usable</li>
                 <li>{{ ColumnManager.UsableColumns.getTotalVisibleSingleLevelColumns() }} single level</li>
                 <li>{{ ColumnManager.UsableColumns.getTotalVisibleNestedDepthColumns() }} nested depth</li>
@@ -159,9 +151,6 @@
               v-for="column in (
                 Array.from(ColumnManager.UsableColumns.columnsSet.value)
                 .filter(col => col.derivedFromColumn == null)
-                // Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
-                  // .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
-                  // .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
             )"
             >
               <td
@@ -190,22 +179,22 @@
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(column.serializedEffectiveLookupPath)"
-                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.categoricalColumns)"
+                  <input type="checkbox" :checked="column.renderType == ColumnRendererType.CATEGORICAL"
+                    @change="toggleColumnRendererType(column, ColumnRendererType.CATEGORICAL)"
                   />
                 </label>
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.timeColumns.value.has(column.serializedEffectiveLookupPath)"
-                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.timeColumns)"
+                  <input type="checkbox" :checked="column.renderType == ColumnRendererType.TIME"
+                    @change="toggleColumnRendererType(column, ColumnRendererType.TIME)"
                   />
                 </label>
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(column.serializedEffectiveLookupPath)"
-                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.coerceToNumberColumns)"
+                  <input type="checkbox" :checked="column.transformations?.includes(ColumnTransformation.NUMBER)"
+                    @change="toggleColumnTransformation(column, ColumnTransformation.NUMBER)"
                   />
                 </label>
               </td>
@@ -376,7 +365,7 @@ import ColorizedNestedColumn from '@/components/ColorizedNestedColumn.vue';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
 import { Colorizer } from './styling';
-import { collapsibleDataManager } from '@/utils/columnManager';
+import { ColumnTransformation, ColumnRendererType } from '@/utils/columnManager';
 
 
 const props = defineProps<{
@@ -393,8 +382,7 @@ function makeExpandedColumnHeader() {
       const sortOrder = ref(params.column.getSort());
 
       const collapseKey = () => {
-        const keyToRemove = params.key as ColumnManager.ColumnKey;
-        ColumnManager.UsableColumns.setDisplayOff(keyToRemove.effectiveLookupPath);
+        ColumnManager.UsableColumns.setDisplayOff([params.key]);
         updateColumnDefs();
       };
 
@@ -558,6 +546,20 @@ const toggleColumnTracker = (column: string, tracker: Ref<Set<string>>) => {
   updateColumnDefs();
 };
 
+const toggleColumnTransformation = (column: ColumnManager.ColumnKey, transformation: ColumnTransformation) => {
+  if (column.transformations?.includes(transformation)) {
+    column.transformations = column.transformations.filter(t => t !== transformation);
+  } else {
+    column.transformations = [...(column.transformations ?? []), transformation];
+  }
+  updateColumnDefs();
+}
+
+const toggleColumnRendererType = (column: ColumnManager.ColumnKey, rendererType: ColumnRendererType) => {
+  column.renderType = rendererType;
+  updateColumnDefs();
+}
+
 const defaultColDef = reactive({
   flex: 1,
   minWidth: 100,
@@ -612,20 +614,13 @@ const underiveColumn = (derivedColumn: ColumnManager.ColumnKey) => {
 
   gridApi.value?.applyTransaction({ update: rowsToUpdate });
 
-//  if( columnGroup.isFromExpandedData ) {
-//    // expandableDataManager.unhideKey(columnGroup.originalColumn);
-//  } else {
-//    // collapsibleDataManager.unhideKey(columnGroup.originalColumn);
-//  }
-//
-//  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value = ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.filter(group => group.originalColumn !== columnGroup.originalColumn);
   updateColumnDefs();
 }
 
 const extractUnits = async (column: ColumnManager.ColumnKey) => {
   if(!gridApi.value) return;
   function makeUnitColumn(columnPrefix: string, unit: string) {
-    return `${columnPrefix}.${unit}`;
+    return `${columnPrefix}.${unit == "." ? "" : unit}`;
   }
   const discoveredUnitColumns = new Set<string>();
   const trackIsFromExpandedData = new Set<boolean>();
@@ -686,21 +681,6 @@ const extractUnits = async (column: ColumnManager.ColumnKey) => {
   }
 
   gridApi.value?.applyTransaction({ update: rowsToUpdate });
-
-  const isFromExpandedData = trackIsFromExpandedData.has(true);
-  // ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.push({
-  //   originalColumn: column.apparentLookupPath,
-  //   isFromExpandedData,
-  //   derivedColumns: Array.from(discoveredUnitColumns),
-  // });
-
-  // note this is super tricky because if the column is from the expanded data,
-  // it gets placed into the row data, which gets picked up as collapsed data
-  if(isFromExpandedData) {
-    // expandableDataManager.hideKey(column);
-  } else {
-    // collapsibleDataManager.hideKey(column);
-  }
   updateColumnDefs();
 }
 
@@ -708,7 +688,6 @@ const totalExpandableRows = ref<number>(0)
 
 const processRows = async () => {  // process the incoming data, derive columns etc
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
-  ColumnManager.DEPRECATE_coreDetectedKeys.value.clear();
 
   ColumnManager.UsableColumns.reset();
 
@@ -851,19 +830,20 @@ const updateColumnDefs = () => {
   };
 
   function selectRenderer(
-    serializedPath: string,
-    nativePath: string,
-    humanReadablePath: string | undefined = undefined
+    columnKey: ColumnManager.ColumnKey,
   ) {
+    const serializedPath = columnKey.serializedEffectiveLookupPath;
+    const nativePath = columnKey.apparentLookupPath;
+    const humanReadablePath = columnKey.displayString;
+    
     // console.log("selectRenderer", serializedPath);
-    if (ColumnManager.ColumnTypeTracker.timeColumns.value.has(serializedPath)) {
+    if (columnKey.renderType == ColumnRendererType.TIME) {
       return {
         field: nativePath,
         headerName: humanReadablePath ?? serializedPath,
         cellRenderer: 'timeCellRenderer',
       }
-    } else if (ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(serializedPath)) {
-      console.log("categorical", serializedPath);
+    } else if (columnKey.renderType == ColumnRendererType.CATEGORICAL) {
       return {
         field: nativePath,
         headerName: humanReadablePath ?? serializedPath,
@@ -894,11 +874,7 @@ const updateColumnDefs = () => {
       // && col.apparentLookupPath != ColumnManager.COLLAPSABLE_DATA_COLUMN
     })
     .map(col => {
-      return selectRenderer(
-        col.serializedEffectiveLookupPath,
-        col.apparentLookupPath,
-        col.displayString
-      );
+      return selectRenderer(col);
     })
     .concat(
       [
@@ -908,15 +884,15 @@ const updateColumnDefs = () => {
         ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
       ]
       .map(col => {
-        return {
-          serializedPath: JSON.stringify([col]),
-          nativePath: col,
-          humanReadablePath: col,
-        }
-      })
-      .map(col => {
-        return selectRenderer(col.serializedPath, col.nativePath, col.humanReadablePath);
-      }).filter(colDef => colDef)
+        const columnKey: ColumnManager.ColumnKey = {
+          effectiveLookupPath: [col],
+          apparentLookupPath: col,
+          displayString: col,
+          shouldDisplay: true,
+          serializedEffectiveLookupPath: JSON.stringify([col]),
+        };
+        return selectRenderer(columnKey);
+      }).filter(colDef => colDef != null)
     )
   );
 
@@ -931,24 +907,21 @@ const updateColumnDefs = () => {
       ? 'my-ag-table-collapsible-data-expanded-column'
       : 'my-ag-table-collapsible-data-expanded-column my-ag-table-is-derived-column',
       cellClass: 'my-ag-table-collapsible-data-expanded-cell',
-      cellRenderer: selectRenderer(
-        col.serializedEffectiveLookupPath,
-        col.apparentLookupPath,
-        col.displayString
-      ).cellRenderer,
+      cellRenderer: selectRenderer(col).cellRenderer,
       headerComponent: expandableCollapsibleDataColumnHeader,
       headerComponentParams: {
         key: col.effectiveLookupPath[0],
       },
       valueFormatter: (params: ValueFormatterParams) => {
         if (col.derivedFromColumn == null) {
-          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(col.serializedEffectiveLookupPath)) {
+          if (col.transformations?.includes(ColumnTransformation.NUMBER)) {
             return coerceToNumber(params.value) ?? "";
+          } else {
+            return params.value ?? "";
           }
         } else {
           return params.data[col.apparentLookupPath] ?? "";
         }
-        return ""
       },
     }));
 
@@ -971,16 +944,12 @@ const updateColumnDefs = () => {
           // WARN: assuming 1 level of nesting for now
           // WARN: the ?? part is _probably_ when the expanded data is visible
           const value = params.data?.[ColumnManager.EXPANDABLE_DATA_COLUMN][colKey.serializedEffectiveLookupPath] ?? params.value?.[colKey.apparentLookupPath];
-          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(colKey.serializedEffectiveLookupPath)) {
+          if (colKey.transformations?.includes(ColumnTransformation.NUMBER)) {
             return coerceToNumber(value) ?? "";
           }
           return value ?? "";
         },
-        cellRenderer: selectRenderer(
-          colKey.serializedEffectiveLookupPath,
-          colKey.apparentLookupPath,
-          colKey.displayString
-        ).cellRenderer,
+        cellRenderer: selectRenderer(colKey).cellRenderer,
       }
     });
 
@@ -1070,13 +1039,12 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
 
 const toggleExpandCollapsibleKeys = (rowIndex: number) => {
   console.log("!!!toggleExpandExtraDataKeys", rowIndex);
-  if (collapsibleDataManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
-    collapsibleDataManager.collapsibleDataExpandedRows.value.delete(rowIndex);
+  if (ColumnManager.collapsibleDataExpandedRows.value.has(rowIndex)) {
+    ColumnManager.collapsibleDataExpandedRows.value.delete(rowIndex);
   } else {
-    collapsibleDataManager.collapsibleDataExpandedRows.value.add(rowIndex);
+    ColumnManager.collapsibleDataExpandedRows.value.add(rowIndex);
     const row = rowData.value[rowIndex];
     if (row) {
-      console.log("row", row);
       Object.keys(row).filter(
         key => !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
       ).forEach(key => {
@@ -1088,25 +1056,12 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
 }
 
 const restoreAllCollapsedRows = () => {
-
   ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = true);
-
-
-  rowData.value.forEach(row => {
-    collapsibleDataManager.collapsibleDataExpandedRows.value.add(row.id);
-    // Object.keys(row).filter(
-    //   key => !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
-    // ).forEach(key => collapsibleDataManager.collapsibleDataExpandedKeys.value.add(key));
-  });
-  // collapsibleDataManager.collapsibleDataCollapsedKeys.value.clear();
   updateColumnDefs();
 };
 
 const collapseAllCollapsibleRows = () => {
-
   ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = false);
-  collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
-
   updateColumnDefs();
 };
 
@@ -1300,7 +1255,7 @@ const dataSource: IDatasource = {
       // when used as infinite datasource, it has problem
       for (const row of rows) {
         row.payload = JSON.parse(row.payload);
-        // Object.keys(row.payload).forEach(key => collapsibleDataManager.detectedKeys.value.add(key));
+        // Object.keys(row.payload).forEach(key => ColumnManager.detectedKeys.value.add(key));
       }
       
       // If this is the last block of data, pass the actual row count

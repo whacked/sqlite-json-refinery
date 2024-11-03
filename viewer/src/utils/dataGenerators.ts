@@ -37,7 +37,7 @@ export function generateData(count: number) {
       id: faker.string.uuid(),
       // .person.fullName(),
       // email: faker.internet.email(),
-      phone: faker.phone.number(),
+      // phone: faker.phone.number(),
       // company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),

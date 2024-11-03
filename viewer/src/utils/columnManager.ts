@@ -47,6 +47,14 @@ export interface DispalyableColumn {
     isEnabled: boolean;
 }
 
+export enum ColumnTransformation {
+    NUMBER,
+}
+
+export enum ColumnRendererType {
+    TIME,
+    CATEGORICAL,
+}
 
 export interface ColumnKey {
     effectiveLookupPath: string[];  // the actual code-friendly lookup path
@@ -55,6 +63,8 @@ export interface ColumnKey {
     shouldDisplay: boolean;
     serializedEffectiveLookupPath: string;
     derivedFromColumn?: ColumnKey | null;
+    transformations?: Array<ColumnTransformation | null>;
+    renderType?: ColumnRendererType | null;
 }
 
 export namespace UsableColumns {
@@ -112,6 +122,30 @@ export namespace UsableColumns {
         return Array.from(columnsSet.value).filter(col => col.derivedFromColumn != null);
     }
 
+    export function getTotalTransformedColumns(transformationType?: ColumnTransformation): number {
+        let totalColumns = 0
+        for (const column of columnsSet.value) {
+            if (transformationType == null) {
+                totalColumns++;
+            } else if (column.transformations?.includes(transformationType)) {
+                totalColumns++;
+            }
+        }
+        return totalColumns;
+    }
+
+    export function getTotalSpeciallyRenderedColumns(rendererType?: ColumnRendererType): number {
+        let totalColumns = 0;
+        for (const column of columnsSet.value) {
+            if (rendererType == null) {
+                totalColumns++;
+            } else if (column.renderType == rendererType) {
+                totalColumns++;
+            }
+        }
+        return totalColumns;
+    }
+
     export function getTotalCollapsedCountString(): string {
         const totalColumns = getAllSingleLevelColumns().length;
         const totalHiddenColumns = getTotalHiddenSingleLevelColumns();
@@ -139,7 +173,6 @@ export namespace UsableColumns {
 }
 
 
-export const DEPRECATE_coreDetectedKeys = ref<Set<ColumnKey>>(new Set());
 export const availableColumns = ref<DispalyableColumn[]>(
     ([] as DispalyableColumn[])
         .concat(
@@ -151,76 +184,8 @@ export const availableColumns = ref<DispalyableColumn[]>(
 );
 
 
-export namespace ColumnTypeTracker {
-    export const timeColumns = ref(new Set<string>(['time', 'timestamp', 'createdAt', 'updatedAt']));
-    export const categoricalColumns = ref(new Set<string>(['v', 'topic']));
-    export const coerceToNumberColumns = ref(new Set<string>());
-}
-
-
-class CollapsibleColumnsManager {
-
-    public expandedRows: Ref<Set<number>>;
-    public expandedKeys: Ref<Set<string>>;
-    public collapsedKeys: Ref<Set<string>>;
-    public detectedKeys: Ref<Set<string>>;
-    public hiddenKeys: Ref<Set<string>>;
-
-
-    public collapsibleDataExpandedRows: Ref<Set<number>>;
-    public collapsibleDataCollapsedKeys: Ref<Set<string>>;
-    public collapsibleDataExpandedKeys: Ref<Set<string>>;
-
-
-    constructor() {
-        this.expandedRows = ref(new Set<number>());
-        this.expandedKeys = ref(new Set<string>());
-        this.collapsedKeys = ref(new Set<string>());
-
-        this.detectedKeys = ref(new Set<string>());
-        this.hiddenKeys = ref(new Set<string>());
-
-        this.collapsibleDataExpandedRows = this.expandedRows;
-        this.collapsibleDataCollapsedKeys = this.collapsedKeys;
-        this.collapsibleDataExpandedKeys = this.expandedKeys;
-    }
-
-    getVisibleKeys(): Array<string> {
-        return Array.from(this.expandedKeys.value)
-            .filter(key => !this.hiddenKeys.value.has(key));
-    }
-
-    contractKey(key: string): void {
-        this.expandedKeys.value.delete(key);
-        this.collapsedKeys.value.add(key);
-    }
-
-    hideKey(key: string): void {
-        this.hiddenKeys.value.add(key);
-        this.expandedKeys.value.delete(key);
-        this.collapsedKeys.value.delete(key);
-    }
-
-    unhideKey(key: string): void {
-        this.hiddenKeys.value.delete(key);
-        this.expandedKeys.value.add(key);
-        this.collapsedKeys.value.delete(key);
-    }
-
-    resetKeys(): void {
-        this.expandedKeys.value.clear();
-        this.collapsedKeys.value = new Set(this.detectedKeys.value);
-    }
-
-    clearAll(): void {
-        this.detectedKeys.value.clear();
-        this.hiddenKeys.value.clear();
-        this.resetKeys();
-    }
-}
-
-export const collapsibleDataManager = new CollapsibleColumnsManager();
-
+export const collapsibleDataExpandedRows: Ref<Set<number>> = ref(new Set<number>());
+export const expandableDataExpandedRows: Ref<Set<number>> = ref(new Set<number>());
 
 export interface RenderParams {
     node?: IRowNode<any>;
@@ -275,6 +240,9 @@ export function parseValueWithUnitSuffix(value: string, shouldForceLowerCaseUnit
 } {
     if (!value) {
         return { value: null, unit: null };
+    }
+    if (typeof value !== 'string') {
+        return { value: value, unit: null };
     }
     const match = value.match(/^\s*(\d+(?:\.\d+)?|\.\d+)(\D*)\s*$/);
     if (!match) {
