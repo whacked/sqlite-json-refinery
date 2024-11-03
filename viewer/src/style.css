@@ -253,6 +253,10 @@ button:focus-visible {
   background: #d9eefb;
 }
 
+.my-ag-table-is-derived-column {
+  border: 3px solid red;
+}
+
 /* core columns */
 .column-checkbox {
   display: inline-block;

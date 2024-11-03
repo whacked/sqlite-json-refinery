@@ -1,5 +1,5 @@
 <template>
-  <span v-for="(word, index) in props.column.split('.').filter(w => w.length > 0)" 
+  <span v-for="(word, index) in props.columnText.split('.').filter(w => w.length > 0)" 
         :key="word"
         class="ag-header-cell-text"
         :style="Colorizer.makeTextContainerStyle(word)">
@@ -11,6 +11,6 @@
 import { Colorizer } from './styling';
 
 const props = defineProps<{
-    column: string;
+    columnText: string;
 }>();
 </script>

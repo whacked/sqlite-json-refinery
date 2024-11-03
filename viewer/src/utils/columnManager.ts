@@ -1,5 +1,5 @@
 import { Ref, ref } from 'vue';
-import { IRowNode } from 'ag-grid-community';
+import { ColDef, IRowNode } from 'ag-grid-community';
 
 export const EXPANDABLE_DATA_COLUMN = 'payload';
 export const EXPANDABLE_DATA_COLUMN_SHADOW = 'payloadString';
@@ -18,7 +18,7 @@ export function getExpandableDataColumnSubKey(key: string): string {
     return key.substring(EXPANDABLE_DATA_COLUMN.length + 1);
 }
 
-export const CUSTOMARY_COLUMN_KEYS = ref(new Set<string>([
+export const CUSTOMARY_COLUMN_KEYS = new Set([
     'id',
     'country',
     'createdAt',
@@ -28,7 +28,11 @@ export const CUSTOMARY_COLUMN_KEYS = ref(new Set<string>([
     'category',
     'entry',
     /* 'price', */
-]));
+]);
+export const SERIALIZED_CUSTOMARY_COLUMN_KEYS = ref<Set<string>>(
+    new Set(
+        Array.from(CUSTOMARY_COLUMN_KEYS)
+            .map(key => JSON.stringify([key]))));
 
 export const SPECIAL_COLUMN_KEYS = new Set([
     EXPANDABLE_DATA_COLUMN,
@@ -49,12 +53,17 @@ export interface ColumnKey {
     apparentLookupPath: string;  // the that the human uses to refer to the data
     displayString: string;
     shouldDisplay: boolean;
+    serializedEffectiveLookupPath: string;
+    derivedFromColumn?: ColumnKey | null;
 }
 
 export namespace UsableColumns {
     export const columnsSet = ref<Set<ColumnKey>>(new Set());
 
     const stringifiedLookup = new Map<string, ColumnKey>();
+
+    export const visibleSingleLevelColumnDataRowIds = ref<Set<number>>(new Set());
+    export const visibleNestedDepthColumnDataRowIds = ref<Set<number>>(new Set());
 
     export function reset() {
         stringifiedLookup.clear();
@@ -73,7 +82,6 @@ export namespace UsableColumns {
     }
 
     export function setDisplayOff(keyPath: string[]) {
-        console.log("setDisplayOff", keyPath);
         const column = getColumn(keyPath);
         if (column) {
             column.shouldDisplay = false;
@@ -90,6 +98,18 @@ export namespace UsableColumns {
 
     export function getTotalHiddenSingleLevelColumns(): number {
         return getAllSingleLevelColumns().length - getTotalVisibleSingleLevelColumns();
+    }
+
+    export function getTotalVisibleNestedDepthColumns(): number {
+        return Array.from(columnsSet.value).filter(col => col.effectiveLookupPath.length > 1 && col.shouldDisplay).length;
+    }
+
+    export function getTotalHiddenNestedDepthColumns(): number {
+        return getAllNestedDepthColumns().length - getTotalVisibleNestedDepthColumns();
+    }
+
+    export function getDerivedColumns(): ColumnKey[] {
+        return Array.from(columnsSet.value).filter(col => col.derivedFromColumn != null);
     }
 
     export function getTotalCollapsedCountString(): string {
@@ -110,6 +130,12 @@ export namespace UsableColumns {
         stringifiedLookup.set(stringifiedEffectiveLookupPath, columnKey);
         columnsSet.value.add(columnKey);
     }
+
+    export function removeColumn(columnKey: ColumnKey) {
+        const stringifiedEffectiveLookupPath = JSON.stringify(columnKey.effectiveLookupPath);
+        stringifiedLookup.delete(stringifiedEffectiveLookupPath);
+        columnsSet.value.delete(columnKey);
+    }
 }
 
 
@@ -117,7 +143,7 @@ export const DEPRECATE_coreDetectedKeys = ref<Set<ColumnKey>>(new Set());
 export const availableColumns = ref<DispalyableColumn[]>(
     ([] as DispalyableColumn[])
         .concat(
-            Array.from(CUSTOMARY_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
+            Array.from(SERIALIZED_CUSTOMARY_COLUMN_KEYS.value).map(key => ({ key, isEnabled: true }))
         )
     /* .concat(
         Array.from(SPECIAL_COLUMN_KEYS).map(key => ({ key, isEnabled: true }))
@@ -125,32 +151,38 @@ export const availableColumns = ref<DispalyableColumn[]>(
 );
 
 
-export interface DerivedColumnGroup {
-    originalColumn: string;
-    isFromExpandedData: boolean;  // if this is extracted from the json-parsed data or the original payload
-    derivedColumns: string[];
-}
-
-
 export namespace ColumnTypeTracker {
     export const timeColumns = ref(new Set<string>(['time', 'timestamp', 'createdAt', 'updatedAt']));
     export const categoricalColumns = ref(new Set<string>(['v', 'topic']));
     export const coerceToNumberColumns = ref(new Set<string>());
-    export const derivedColumnGroups = ref<DerivedColumnGroup[]>([]);
 }
 
 
-export abstract class ContractableColumnsManager {
+class CollapsibleColumnsManager {
+
+    public expandedRows: Ref<Set<number>>;
+    public expandedKeys: Ref<Set<string>>;
+    public collapsedKeys: Ref<Set<string>>;
     public detectedKeys: Ref<Set<string>>;
     public hiddenKeys: Ref<Set<string>>;
 
-    constructor(
-        public expandedRows: Ref<Set<number>>,
-        public expandedKeys: Ref<Set<string>>,
-        public collapsedKeys: Ref<Set<string>>,
-    ) {
+
+    public collapsibleDataExpandedRows: Ref<Set<number>>;
+    public collapsibleDataCollapsedKeys: Ref<Set<string>>;
+    public collapsibleDataExpandedKeys: Ref<Set<string>>;
+
+
+    constructor() {
+        this.expandedRows = ref(new Set<number>());
+        this.expandedKeys = ref(new Set<string>());
+        this.collapsedKeys = ref(new Set<string>());
+
         this.detectedKeys = ref(new Set<string>());
         this.hiddenKeys = ref(new Set<string>());
+
+        this.collapsibleDataExpandedRows = this.expandedRows;
+        this.collapsibleDataCollapsedKeys = this.collapsedKeys;
+        this.collapsibleDataExpandedKeys = this.expandedKeys;
     }
 
     getVisibleKeys(): Array<string> {
@@ -187,45 +219,6 @@ export abstract class ContractableColumnsManager {
     }
 }
 
-class ExpandableColumnsManager extends ContractableColumnsManager {
-    public expandedExpandableDataRows: Ref<Set<number>>;
-    public expandedExpandableDataKeys: Ref<Set<string>>;
-    public expandableDataUnexpandedKeys: Ref<Set<string>>;
-
-    constructor() {
-        super(
-            ref(new Set<number>()),
-            ref(new Set<string>()),
-            ref(new Set<string>()),
-        );
-
-        this.expandedExpandableDataRows = this.expandedRows;
-        this.expandedExpandableDataKeys = this.expandedKeys;
-        this.expandableDataUnexpandedKeys = this.collapsedKeys;
-    }
-}
-
-export const expandableDataManager = new ExpandableColumnsManager();
-
-
-class CollapsibleColumnsManager extends ContractableColumnsManager {
-    public collapsibleDataExpandedRows: Ref<Set<number>>;
-    public collapsibleDataCollapsedKeys: Ref<Set<string>>;
-    public collapsibleDataExpandedKeys: Ref<Set<string>>;
-
-    constructor() {
-        super(
-            ref(new Set<number>()),
-            ref(new Set<string>()),
-            ref(new Set<string>()),
-        );
-
-        this.collapsibleDataExpandedRows = this.expandedRows;
-        this.collapsibleDataCollapsedKeys = this.collapsedKeys;
-        this.collapsibleDataExpandedKeys = this.expandedKeys;
-    }
-}
-
 export const collapsibleDataManager = new CollapsibleColumnsManager();
 
 
@@ -233,20 +226,14 @@ export interface RenderParams {
     node?: IRowNode<any>;
     data?: any;
     value?: any;
+    colDef?: ColDef;
     coreDisplayParams: Set<string>;
-    collapsedDataKeys: Set<string>;
-    expandableDataExtractedKeys: Set<string>;
-
-    expandableDataHiddenKeys: Set<string>;
-    collapsibleDataHiddenKeys: Set<string>;
-
-    expandableDataManager: ExpandableColumnsManager;
-    collapsibleDataManager: CollapsibleColumnsManager;
 
     toggleExpandCollapsibleKeys: (rowIndex: number) => void;
     toggleExpandExpandableKeys: (rowIndex: number) => void;
     toggleContractExpandableKeys: (rowIndex: number) => void;
 
+    currentExpandedKeys: Set<string>;
     currentRestoredKeys: Set<string>;
 }
 

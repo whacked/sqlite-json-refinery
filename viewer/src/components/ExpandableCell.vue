@@ -16,7 +16,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { RenderParams, EXPANDABLE_DATA_COLUMN, makeExpandableDataColumnKey } from '@/utils/columnManager';
+import { RenderParams, EXPANDABLE_DATA_COLUMN } from '@/utils/columnManager';
 const hasKeys = computed(() => 
   props.params?.data?.[EXPANDABLE_DATA_COLUMN] && Object.keys(props.params.data[EXPANDABLE_DATA_COLUMN]).length > 0);
 
@@ -30,10 +30,8 @@ const payloadRenderable = computed(() => {
     const reducedPayload: Record<string, any> = {};
 
     for (const key of Object.keys(props.params.data[EXPANDABLE_DATA_COLUMN])) {
-        const fullKey = makeExpandableDataColumnKey(key);
         if (
-            props.params.expandableDataExtractedKeys.has(fullKey)
-            || props.params.expandableDataHiddenKeys.has(fullKey)
+            props.params.currentExpandedKeys.has(key)
         ) {
             continue;
         }

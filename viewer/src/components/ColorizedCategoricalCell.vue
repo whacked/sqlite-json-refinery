@@ -1,6 +1,6 @@
 <template>
-    <div :style="textContainerStyle">
-        {{ params.value }}
+    <div :style="Colorizer.makeTextContainerStyle(displayText)">
+        {{ displayText }}
     </div>
 </template>
 
@@ -14,13 +14,9 @@ const props = defineProps<{
     params: RenderParams;
 }>();
 
-const textContainerStyle = computed(() => {
-    const columnKey = (props.params as any).colDef.field
-    if (ColumnManager.isExpandableDataColumnKey(columnKey)) {
-        return Colorizer.makeTextContainerStyle(
-            props.params.data[ColumnManager.EXPANDABLE_DATA_COLUMN][ColumnManager.getExpandableDataColumnSubKey(columnKey)]);
-    } else {
-      return Colorizer.makeTextContainerStyle(props.params.value);
-    }
+const displayText = computed(() => {
+    return props.params.colDef?.field != ColumnManager.EXPANDABLE_DATA_COLUMN
+        ? props.params.value
+        : props.params.value[props.params.colDef?.headerComponentParams.key.apparentLookupPath];
 });
 </script>

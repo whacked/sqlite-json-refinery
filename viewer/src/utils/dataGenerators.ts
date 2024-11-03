@@ -8,6 +8,7 @@ export function generateData(count: number) {
   const NUM_FAKE_COLUMNS = 3;
 
   for (let i = 0; i < NUM_FAKE_COLUMNS; ++i) {
+    break;
     const fakeColumn = faker.lorem.word()
     fakeColumns.push(fakeColumn)
     if (i > 0) {
@@ -32,15 +33,15 @@ export function generateData(count: number) {
 
   return Array.from({ length: count }, () => {
     const sharedShapeData = {
-      /*
+      //*
       id: faker.string.uuid(),
       // .person.fullName(),
       // email: faker.internet.email(),
-      // phone: faker.phone.number(),
+      phone: faker.phone.number(),
       // company: faker.company.name(),
       country: faker.location.country(),
       createdAt: faker.date.past().toISOString(),
-      */
+      // */
       price: `${(Math.random() * 100).toFixed(2)}${getRandomCurrency()}`,
       temperature: Math.random() > 0.5 ? `${Math.floor(Math.random() * 100)}.` : Math.random(),
       ...Object.fromEntries(fakeColumns.map(column => [column, faker.lorem.word()])),
@@ -53,6 +54,7 @@ export function generateData(count: number) {
     /* const numberOfExtraColumns = Math.floor(Math.random() * 30) + 1 */
     const numberOfExtraColumns = 4
     for (let i = 0; i < numberOfExtraColumns; i++) {
+      break;
       if (Math.random() < 0.6) {
         continue;
       }
@@ -60,8 +62,11 @@ export function generateData(count: number) {
       expandablePayloadStringData[columnName] = faker.lorem.word()
     }
 
-    const extraNonPayloadData: { [key: string]: any } = {}
+    const extraNonPayloadData: { [key: string]: any } = {
+      "foo": `${Math.random() * 100}x`,
+    }
     for (let i = 0; i < 4; ++i) {
+      break;
       if (Math.random() < 0.5) {
         continue;
       }
@@ -69,6 +74,6 @@ export function generateData(count: number) {
       extraNonPayloadData[columnName] = faker.animal.type()
     }
 
-    return { ...sharedShapeData, payload: JSON.stringify(expandablePayloadStringData), ...extraNonPayloadData }
+    return { ...sharedShapeData, /* payload: JSON.stringify(expandablePayloadStringData), */ /* ...extraNonPayloadData */ }
   })
 }

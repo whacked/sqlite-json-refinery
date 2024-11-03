@@ -34,20 +34,12 @@
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
         }}; {{ totalExpandableRows }} expandable rows
       </div>
+
+
       <table class="data-keys-table">
         <tbody>
           <tr>
             <th>rows</th><td>{{ props.rowData.length }}</td>
-          </tr>
-
-          <tr class="expandable-data-keys">
-            <th>expandable keys</th><td>{{ expandableDataManager.detectedKeys.value }}</td>
-          </tr>
-          <tr class="expandable-data-keys">
-            <th>unexpanded keys</th><td>{{ expandableDataManager.expandableDataUnexpandedKeys.value }}</td>
-          </tr>
-          <tr class="expandable-data-keys">
-            <th>expanded keys</th><td>{{ expandableDataManager.expandedExpandableDataKeys.value }}</td>
           </tr>
 
           <tr>
@@ -62,7 +54,16 @@
                 ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value
               )"
             >
-              {{ ColumnManager.ColumnTypeTracker.categoricalColumns.value.size }} categorical, {{ ColumnManager.ColumnTypeTracker.timeColumns.value.size }} time, {{ ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.size }} coerce to number
+              <ul>
+                <li>{{ ColumnManager.ColumnTypeTracker.categoricalColumns.value.size }} categorical</li>
+                <li>{{ ColumnManager.ColumnTypeTracker.timeColumns.value.size }} time</li>
+                <li>{{ ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.size }} coerce to number</li>
+                <li>{{ ColumnManager.UsableColumns.columnsSet.value.size }} total usable</li>
+                <li>{{ ColumnManager.UsableColumns.getTotalVisibleSingleLevelColumns() }} single level</li>
+                <li>{{ ColumnManager.UsableColumns.getTotalVisibleNestedDepthColumns() }} nested depth</li>
+                <li>{{ ColumnManager.UsableColumns.getDerivedColumns().length }} derived</li>
+              </ul>
+              
             </td>
           </tr>
         </tbody>
@@ -80,6 +81,7 @@
                     :style="{ display: 'inline-block',
                       marginRight: '10px',
                       border: col.effectiveLookupPath.length == 1 ? '2px solid black' : '2px solid red',
+                      background: col.shouldDisplay ? 'lightgreen' : 'lightgray',
                     }"
                   >
                     {{ col.displayString }}
@@ -93,27 +95,42 @@
             <tr class="collapsible-data-keys">
               <th>collapsible keys</th>
               <td>
-                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
-                  return col.effectiveLookupPath.length == 1
-                }).map(col => col.displayString).join(', ') }}
+                {{ ColumnManager.UsableColumns.getAllSingleLevelColumns().map(col => col.displayString).join(', ') }}
               </td>
             </tr>
             <tr class="collapsible-data-keys">
               <th>collapsed keys</th>
               <td>
-                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
-                  return col.effectiveLookupPath.length == 1 && !col.shouldDisplay
-                }).map(col => col.displayString).join(', ') }}
+                {{ ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => !col.shouldDisplay).map(col => col.displayString).join(', ') }}
               </td>
             </tr>
             <tr class="collapsible-data-keys">
               <th>uncollapsed keys</th>
               <td>
-                {{ Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => {
-                  return col.effectiveLookupPath.length == 1 && col.shouldDisplay
-                }).map(col => col.displayString).join(', ') }}
+                {{ ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => col.shouldDisplay).map(col => col.displayString).join(', ') }}
               </td>
             </tr>
+
+
+            <tr class="expandable-data-keys">
+              <th>expandable keys</th>
+              <td>
+                {{ ColumnManager.UsableColumns.getAllNestedDepthColumns().map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+            <tr class="expandable-data-keys">
+              <th>unexpanded keys keys</th>
+              <td>
+                {{ ColumnManager.UsableColumns.getAllNestedDepthColumns().filter(col => !col.shouldDisplay).map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+            <tr class="expandable-data-keys">
+              <th>expanded keys</th>
+              <td>
+                {{ ColumnManager.UsableColumns.getAllNestedDepthColumns().filter(col => col.shouldDisplay).map(col => col.displayString).join(', ') }}
+              </td>
+            </tr>
+
 
 
 
@@ -140,15 +157,22 @@
 
             <tr
               v-for="column in (
-                Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
+                Array.from(ColumnManager.UsableColumns.columnsSet.value)
+                .filter(col => col.derivedFromColumn == null)
+                // Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
                   // .concat(Array.from(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value))
                   // .concat(Array.from(ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value))
             )"
             >
               <td
-                :style="(ColumnManager.expandableDataManager.expandedExpandableDataKeys.value.has(column) || ColumnManager.collapsibleDataManager.collapsibleDataExpandedKeys.value.has(column)) ? Colorizer.makeTextContainerStyle(column) : null"
+                :style="(
+                  // ColumnManager.expandableDataManager.expandedExpandableDataKeys.value.has(column)
+                  ColumnManager.UsableColumns.getAllNestedDepthColumns().filter(
+                    col => (col.shouldDisplay && JSON.stringify(col.effectiveLookupPath) == JSON.stringify(column.effectiveLookupPath))
+                  ).length > 0
+                || ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => (col.shouldDisplay && col.effectiveLookupPath[0] == column.apparentLookupPath)).length > 0) ? Colorizer.makeTextContainerStyle(column) : null"
               >
-                <ColorizedNestedColumn :column="column" />
+                <ColorizedNestedColumn :columnText="column.displayString" />
               </td>
               <td>
                 <label>
@@ -166,22 +190,22 @@
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(column)"
-                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.categoricalColumns)"
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(column.serializedEffectiveLookupPath)"
+                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.categoricalColumns)"
                   />
                 </label>
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.timeColumns.value.has(column)"
-                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.timeColumns)"
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.timeColumns.value.has(column.serializedEffectiveLookupPath)"
+                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.timeColumns)"
                   />
                 </label>
               </td>
               <td>
                 <label>
-                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(column)"
-                    @change="toggleColumnTracker(column, ColumnManager.ColumnTypeTracker.coerceToNumberColumns)"
+                  <input type="checkbox" :checked="ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(column.serializedEffectiveLookupPath)"
+                    @change="toggleColumnTracker(column.serializedEffectiveLookupPath, ColumnManager.ColumnTypeTracker.coerceToNumberColumns)"
                   />
                 </label>
               </td>
@@ -190,27 +214,28 @@
               </td>
             </tr>
 
-
             <template
-              v-for="columnGroup in ColumnManager.ColumnTypeTracker.derivedColumnGroups.value"
+              v-for="(derivedColumn, index) in Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.derivedFromColumn != null)"
             >
               <tr
-                v-for="(column, index) in columnGroup.derivedColumns"
-                :style="Colorizer.makeTextContainerStyle(columnGroup.originalColumn)"
+                :style="Colorizer.makeTextContainerStyle(derivedColumn.derivedFromColumn!.effectiveLookupPath.join('.'))"
               >
                 <td
-                  :style="Colorizer.makeTextContainerStyle(column)"
+                  :style="Colorizer.makeTextContainerStyle(derivedColumn.derivedFromColumn!.effectiveLookupPath.join('.'))"
                 >
-                  <ColorizedNestedColumn :column="column" />
+                  <ColorizedNestedColumn :columnText="derivedColumn.displayString" />
                 </td>
-                <td></td>
+                <td>
+                  {{ derivedColumn.displayString }}
+                </td>
                 <td></td>
                 <td></td>
                 <td>
-                  <button v-if="index == 0" @click="underiveColumn(columnGroup)">restore</button>
+                  <button v-if="derivedColumn.displayString == derivedColumn.derivedFromColumn!.displayString + '.'" @click="underiveColumn(derivedColumn)">restore</button>
                 </td>
               </tr>
             </template>
+
           </tbody>
         </table>
       </div>
@@ -238,7 +263,7 @@
         :infiniteInitialRowCount="infiniteInitialRowCount"
         :maxBlocksInCache="maxBlocksInCache"
         :rowBuffer="rowBuffer"
-        :rowHeight="ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
         @grid-ready="onGridReady"
         @model-updated="onModelUpdated"
         @first-data-rendered="onFirstDataRendered"
@@ -257,7 +282,7 @@
 
         :rowBuffer="rowBuffer"
         :rowModelType="rowModelType"
-        :rowHeight="ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has('photo') || collapsibleDataManager.collapsibleDataExpandedKeys.value.has('photo') ? 200 : null"
+        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
 
         colon-paginationPageSize="paginationPageSize"
 
@@ -324,7 +349,7 @@
 }
 
 .data-keys-table {
-  font-size: 12pt;
+  font-size: 18pt;
 }
 
 .expandable-data-keys {
@@ -340,7 +365,7 @@
 <script setup lang="ts">
 import { ref, onMounted, reactive, defineComponent, h, Ref, watch } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
-import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, RowNode, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
+import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
@@ -351,7 +376,7 @@ import ColorizedNestedColumn from '@/components/ColorizedNestedColumn.vue';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
 import { Colorizer } from './styling';
-import { collapsibleDataManager, ContractableColumnsManager, expandableDataManager } from '@/utils/columnManager';
+import { collapsibleDataManager } from '@/utils/columnManager';
 
 
 const props = defineProps<{
@@ -359,7 +384,7 @@ const props = defineProps<{
 }>();
 
 
-function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
+function makeExpandedColumnHeader() {
   return defineComponent({
     props: ['displayName', 'onCustomAction'],
     setup(props) {
@@ -368,8 +393,8 @@ function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
       const sortOrder = ref(params.column.getSort());
 
       const collapseKey = () => {
-        const keyToRemove = params.key;
-        ColumnManager.UsableColumns.setDisplayOff([keyToRemove]);
+        const keyToRemove = params.key as ColumnManager.ColumnKey;
+        ColumnManager.UsableColumns.setDisplayOff(keyToRemove.effectiveLookupPath);
         updateColumnDefs();
       };
 
@@ -409,12 +434,11 @@ function makeExpandedColumnHeader(columnsManager: ContractableColumnsManager) {
   })
 }
 
-const expandedPayloadColumnHeader = makeExpandedColumnHeader(expandableDataManager);
-const expandedCollapsibleDataColumnHeader = makeExpandedColumnHeader(collapsibleDataManager);
+const expandableCollapsibleDataColumnHeader = makeExpandedColumnHeader();
 
 const components = {
-  expandedPayloadColumnHeader,
-  expandedExtraDataColumnHeader: expandedCollapsibleDataColumnHeader,
+  expandedPayloadColumnHeader: expandableCollapsibleDataColumnHeader,
+  expandedExtraDataColumnHeader: expandableCollapsibleDataColumnHeader,
   expandableCellRenderer: ExpandableCell,
   extractedDataCellRenderer: CollapsableCell,
   photoCellRenderer: PhotoCell,
@@ -479,6 +503,9 @@ const onModelUpdated = () => {
   //   isEnabled: true,
   // }];
   updateRowCount();
+
+
+  autoSizeColumns();
 };
 
 const onFirstDataRendered = () => {
@@ -498,34 +525,34 @@ const updateRowCount = () => {
 const newColumnName = ref('');
 
 const toggleCoreColumn = (column: string) => {
-  if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(column)) {
-    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.delete(column);
+  if (ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(column)) {
+    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.delete(column);
   } else {
-    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.add(column);
+    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.add(column);
   }
   updateColumnDefs();
 };
 
 const addCoreColumn = () => {
-  if (newColumnName.value && !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(newColumnName.value)) {
-    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.add(newColumnName.value);
+  if (newColumnName.value && !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(newColumnName.value)) {
+    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.add(newColumnName.value);
     newColumnName.value = ''; // Clear the input after adding
     updateColumnDefs();
   }
 };
 
 const removeColumnName = (column: string) => {
-  if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(column)) {
-    ColumnManager.CUSTOMARY_COLUMN_KEYS.value.delete(column);
+  if (ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(column)) {
+    ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.delete(column);
     updateColumnDefs();
   }
 };
 
 const toggleColumnTracker = (column: string, tracker: Ref<Set<string>>) => {
-  console.log("TOGGLE", column, tracker.value);
   if (tracker.value.has(column)) {
     tracker.value.delete(column);
   } else {
+    console.log("adding", column);
     tracker.value.add(column);
   }
   updateColumnDefs();
@@ -558,33 +585,44 @@ function coerceToNumber(value: string) {
   return parseFloat(value);
 }
 
-const underiveColumn = (columnGroup: ColumnManager.DerivedColumnGroup) => {
+const underiveColumn = (derivedColumn: ColumnManager.ColumnKey) => {
   if(!gridApi.value) return;
+
+  const sourceColumn = derivedColumn.derivedFromColumn;
+  const columnsToRemove = Array.from(ColumnManager.UsableColumns.columnsSet.value)
+  .filter(col => {
+    if(col.derivedFromColumn == sourceColumn) {
+      ColumnManager.UsableColumns.removeColumn(col);
+      console.log("removed", col.apparentLookupPath);
+      return true;
+    }
+    return false;
+  });
 
   const rowsToUpdate: any[] = [];
   for(let i = 0; i < gridApi.value.getDisplayedRowCount(); ++i) {
     const row = gridApi.value.getDisplayedRowAtIndex(i);
     if (!row || !row.data) continue;
 
-    for(const column of columnGroup.derivedColumns) {
-      delete row.data[column];
+    for(const column of columnsToRemove) {
+      delete row.data[column.apparentLookupPath];
       rowsToUpdate.push(row.data);
     }
   }
 
   gridApi.value?.applyTransaction({ update: rowsToUpdate });
 
-  if( columnGroup.isFromExpandedData ) {
-    expandableDataManager.unhideKey(columnGroup.originalColumn);
-  } else {
-    collapsibleDataManager.unhideKey(columnGroup.originalColumn);
-  }
-
-  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value = ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.filter(group => group.originalColumn !== columnGroup.originalColumn);
+//  if( columnGroup.isFromExpandedData ) {
+//    // expandableDataManager.unhideKey(columnGroup.originalColumn);
+//  } else {
+//    // collapsibleDataManager.unhideKey(columnGroup.originalColumn);
+//  }
+//
+//  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value = ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.filter(group => group.originalColumn !== columnGroup.originalColumn);
   updateColumnDefs();
 }
 
-const extractUnits = async (column: string) => {
+const extractUnits = async (column: ColumnManager.ColumnKey) => {
   if(!gridApi.value) return;
   function makeUnitColumn(columnPrefix: string, unit: string) {
     return `${columnPrefix}.${unit}`;
@@ -601,12 +639,12 @@ const extractUnits = async (column: string) => {
     // or if it's an expandable-data value
     let expandedDataValue: any | null;
     let maybeOriginalDataValue: any | null;
-    if (ColumnManager.isExpandableDataColumnKey(column)) {
-      expandedDataValue = row.data[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[ColumnManager.getExpandableDataColumnSubKey(column)];
+    if(column.effectiveLookupPath[0] == ColumnManager.EXPANDABLE_DATA_COLUMN) {
+      expandedDataValue = _getIn(row.data, column.effectiveLookupPath);
     } else {
-      maybeOriginalDataValue = row.data[column];
+      maybeOriginalDataValue = row.data[column.apparentLookupPath];
     }
-
+    
     if(expandedDataValue === undefined && maybeOriginalDataValue === undefined) {
       continue;
     }
@@ -620,11 +658,26 @@ const extractUnits = async (column: string) => {
     }
 
     const parsedValue = ColumnManager.parseValueWithUnitSuffix(rowValue);
+    let discoveredUnitColumn: string | undefined = undefined;
     if (parsedValue.unit != null) {
-      const unitColumn = makeUnitColumn(column, parsedValue.unit);
-      discoveredUnitColumns.add(unitColumn);
-      row.data[unitColumn] = parsedValue.value;
-      rowsToUpdate.push(row.data); 
+      discoveredUnitColumn = makeUnitColumn(column.apparentLookupPath, parsedValue.unit);
+      discoveredUnitColumns.add(discoveredUnitColumn);
+      row.data[discoveredUnitColumn] = parsedValue.value;
+      rowsToUpdate.push(row.data);
+
+      const derivedColumnLookupPath: string[] = [
+        ...(column.effectiveLookupPath.slice(0, -1)),
+        discoveredUnitColumn,
+      ]
+
+      ColumnManager.UsableColumns.addColumn({
+        effectiveLookupPath: derivedColumnLookupPath,
+        apparentLookupPath: discoveredUnitColumn,
+        displayString: discoveredUnitColumn,
+        shouldDisplay: true,
+        serializedEffectiveLookupPath: JSON.stringify(derivedColumnLookupPath),
+        derivedFromColumn: column,
+      });
     }
   }
 
@@ -635,18 +688,18 @@ const extractUnits = async (column: string) => {
   gridApi.value?.applyTransaction({ update: rowsToUpdate });
 
   const isFromExpandedData = trackIsFromExpandedData.has(true);
-  ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.push({
-    originalColumn: column,
-    isFromExpandedData,
-    derivedColumns: Array.from(discoveredUnitColumns),
-  });
+  // ColumnManager.ColumnTypeTracker.derivedColumnGroups.value.push({
+  //   originalColumn: column.apparentLookupPath,
+  //   isFromExpandedData,
+  //   derivedColumns: Array.from(discoveredUnitColumns),
+  // });
 
   // note this is super tricky because if the column is from the expanded data,
   // it gets placed into the row data, which gets picked up as collapsed data
   if(isFromExpandedData) {
-    expandableDataManager.hideKey(column);
+    // expandableDataManager.hideKey(column);
   } else {
-    collapsibleDataManager.hideKey(column);
+    // collapsibleDataManager.hideKey(column);
   }
   updateColumnDefs();
 }
@@ -656,10 +709,12 @@ const totalExpandableRows = ref<number>(0)
 const processRows = async () => {  // process the incoming data, derive columns etc
   const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
   ColumnManager.DEPRECATE_coreDetectedKeys.value.clear();
-  collapsibleDataManager.clearAll();
-  expandableDataManager.clearAll();
+
+  ColumnManager.UsableColumns.reset();
 
   rowData.value = sourceData.map(row => {
+    let expandableData: object | null = null;
+
     Object.keys(row).forEach(key => {
 
 
@@ -670,50 +725,48 @@ const processRows = async () => {  // process the incoming data, derive columns 
           apparentLookupPath: key,
           displayString: key,
           shouldDisplay: false,
+          serializedEffectiveLookupPath: JSON.stringify([key]),
         });
 
       } else {
 
-        const expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
-        if (expandableData) {
-          Object.keys(expandableData).forEach(subKey => {
+        const maybeExpandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
+        if (maybeExpandableData) {
+          totalExpandableRows.value++;
+          expandableData = maybeExpandableData;
+          Object.keys(maybeExpandableData).forEach(subKey => {
+            const effectiveLookupPath = [ColumnManager.EXPANDABLE_DATA_COLUMN, subKey];
             ColumnManager.UsableColumns.addColumn({
-              effectiveLookupPath: [ColumnManager.EXPANDABLE_DATA_COLUMN, subKey],
+              effectiveLookupPath,
               apparentLookupPath: subKey,
               displayString: ColumnManager.makeExpandableDataColumnKey(subKey),
               shouldDisplay: false,
+              serializedEffectiveLookupPath: JSON.stringify(effectiveLookupPath),
             });
           });
         }
-
-
       }
 
-
-      if (ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key)) {
-        ColumnManager.DEPRECATE_coreDetectedKeys.value.add({
+      if (ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(key)) {
+        ColumnManager.UsableColumns.addColumn({
           effectiveLookupPath: [key],
           apparentLookupPath: key,
           displayString: key,
           shouldDisplay: true,
+          serializedEffectiveLookupPath: JSON.stringify([key]),
         });
+        // ColumnManager.DEPRECATE_coreDetectedKeys.value.add({
+        //   effectiveLookupPath: [key],
+        //   apparentLookupPath: key,
+        //   displayString: key,
+        //   shouldDisplay: true,
+        //   serializedEffectiveLookupPath: JSON.stringify([key]),
+        // });
       } else if(key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
-        collapsibleDataManager.detectedKeys.value.add(key);
+        // collapsibleDataManager.detectedKeys.value.add(key);
       }
     });
-    let expandableData: object | null = null;
-    if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-      totalExpandableRows.value++;
-      expandableData = JSON.parse(row[ColumnManager.EXPANDABLE_DATA_COLUMN]);
-      if (expandableData) {
-        Object.keys(expandableData).forEach(key => {
-          const fullKey = ColumnManager.makeExpandableDataColumnKey(key);
-          expandableDataManager.detectedKeys.value.add(fullKey);
-          expandableDataManager.expandableDataUnexpandedKeys.value.add(fullKey);
-        });
-      }
-    }
-    collapsibleDataManager.resetKeys()
+
     return {
       ...row,
       [ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]: JSON.stringify(ColumnManager.objectWithoutKeys(row, ColumnManager.SPECIAL_COLUMN_KEYS)),
@@ -728,19 +781,13 @@ const processRows = async () => {  // process the incoming data, derive columns 
 
 const updateColumnDefs = () => {
   const cellRendererParams: ColumnManager.RenderParams = {
-    coreDisplayParams: ColumnManager.CUSTOMARY_COLUMN_KEYS.value,
-    expandableDataExtractedKeys: expandableDataManager.expandedExpandableDataKeys.value,
-    collapsedDataKeys: collapsibleDataManager.collapsibleDataExpandedKeys.value,
-    collapsibleDataHiddenKeys: collapsibleDataManager.hiddenKeys.value,
-    expandableDataHiddenKeys: expandableDataManager.hiddenKeys.value,
-    // for whatever reason, passing the manager itself has different behavior
-    // or it's actually not the same object?
-    expandableDataManager,
-    collapsibleDataManager,
+    coreDisplayParams: ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value,
+    
     toggleExpandCollapsibleKeys,
     toggleExpandExpandableKeys,
     toggleContractExpandableKeys,
 
+    currentExpandedKeys: new Set<string>(ColumnManager.UsableColumns.getAllNestedDepthColumns().filter(col => col.shouldDisplay).map(col => col.effectiveLookupPath[1])),
     currentRestoredKeys: new Set<string>(ColumnManager.UsableColumns.getAllSingleLevelColumns().filter(col => col.shouldDisplay).map(col => col.effectiveLookupPath[0])),
   };
 
@@ -757,6 +804,12 @@ const updateColumnDefs = () => {
       headerName: 'collapsed data String (not shown; for filtering)',
       hide: true,
     },
+    [ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW]: { 
+      field: ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
+      headerName: 'Expandable Data String (not shown; for filtering)', 
+      hide: true 
+    },
+
     [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
       headerName: ColumnManager.UsableColumns.getTotalCollapsedCountString(),
@@ -795,139 +848,139 @@ const updateColumnDefs = () => {
         }
       }),
     },
-    [ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW]: { 
-      field: ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
-      headerName: 'Expandable Data String (not shown; for filtering)', 
-      hide: true 
-    },
   };
 
-  function selectRenderer(key: string) {
-    if (ColumnManager.ColumnTypeTracker.timeColumns.value.has(key)) {
+  function selectRenderer(
+    serializedPath: string,
+    nativePath: string,
+    humanReadablePath: string | undefined = undefined
+  ) {
+    // console.log("selectRenderer", serializedPath);
+    if (ColumnManager.ColumnTypeTracker.timeColumns.value.has(serializedPath)) {
       return {
-        field: key,
-        headerName: key,
+        field: nativePath,
+        headerName: humanReadablePath ?? serializedPath,
         cellRenderer: 'timeCellRenderer',
       }
-    } else if (ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(key)) {
+    } else if (ColumnManager.ColumnTypeTracker.categoricalColumns.value.has(serializedPath)) {
+      console.log("categorical", serializedPath);
       return {
-        field: key,
-        headerName: key,
+        field: nativePath,
+        headerName: humanReadablePath ?? serializedPath,
         cellRenderer: 'colorizedCategoricalCellRenderer',
       }
     } else {
-      return coreDisplayParamSettings[key] ?? {
-        field: key,
-        headerName: key,
+      // console.log("coreDisplayParamSettings", nativePath, serializedPath);
+      // console.log("==>", coreDisplayParamSettings[nativePath])
+      // console.log("==>", {
+      //   field: nativePath,
+      //   headerName: humanReadablePath ?? serializedPath,
+      //   cellRenderer: null,
+      // })
+      return coreDisplayParamSettings[nativePath] ?? {
+        field: nativePath,
+        headerName: humanReadablePath ?? serializedPath,
         cellRenderer: null,
       }
     }
   }
 
   const baseColumns: ColDef[] = (
-    Array.from(ColumnManager.DEPRECATE_coreDetectedKeys.value)
-    .concat([
-      ColumnManager.COLLAPSABLE_DATA_COLUMN,
-      // needed for filtering
-      ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
-      ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
-    ])
-    .map(key => selectRenderer(key))
-    .filter(colDef => colDef)
+    Array.from(ColumnManager.UsableColumns.getAllSingleLevelColumns())
+    .filter(col => {
+      console.log("col", col.serializedEffectiveLookupPath, ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath));
+      return ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)
+      // return col.apparentLookupPath != ColumnManager.EXPANDABLE_DATA_COLUMN
+      // && col.apparentLookupPath != ColumnManager.COLLAPSABLE_DATA_COLUMN
+    })
+    .map(col => {
+      return selectRenderer(
+        col.serializedEffectiveLookupPath,
+        col.apparentLookupPath,
+        col.displayString
+      );
+    })
+    .concat(
+      [
+        ColumnManager.COLLAPSABLE_DATA_COLUMN,
+        // needed for filtering
+        ColumnManager.EXPANDABLE_DATA_COLUMN_SHADOW,
+        ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW,
+      ]
+      .map(col => {
+        return {
+          serializedPath: JSON.stringify([col]),
+          nativePath: col,
+          humanReadablePath: col,
+        }
+      })
+      .map(col => {
+        return selectRenderer(col.serializedPath, col.nativePath, col.humanReadablePath);
+      }).filter(colDef => colDef)
+    )
   );
 
-  const derivedColumns: ColDef[] = [];
-  for(const group of ColumnManager.ColumnTypeTracker.derivedColumnGroups.value) {
-    for(const col of group.derivedColumns) {
-      // prevent the derived columns from being picked up as collapsed data
-      collapsibleDataManager.hideKey(col)
-      derivedColumns.push({
-        field: col,
-        headerName: col,
-        headerClass: group.isFromExpandedData ? 'my-ag-table-expandable-data-header' : 'my-ag-table-derived-from-expanded-data-header',
-        headerComponent: (
-          defineComponent({
-            props: ['displayName', 'onCustomAction'],
-            setup(props) {
-              //@ts-ignore  this is correct, but flagged by the linter
-              const params = props.params;
-              const sortOrder = ref(params.column.getSort());
-
-              /* this does NOT work */
-              const onSortClicked = (event: MouseEvent) => {
-                params.progressSort(event.shiftKey);
-                sortOrder.value = params.column.getSort();
-              };
-
-              params.column.addEventListener('sortChanged', () => {
-                sortOrder.value = params.column.getSort();
-              });
-
-              return () => h('div', {
-                class: 'ag-header-cell-label my-ag-table-expanded-column-header',
-              }, [
-                ...(
-                  [h(ColorizedNestedColumn, {
-                    column: params.displayName
-                  })]
-                ),
-                /* sort button does not work */
-                /* h('button', {
-                  class: 'ag-my-sort-button',
-                  onClick: onSortClicked
-                }, (
-                  sortOrder.value === "asc" ? '▲' : 
-                  sortOrder.value === "desc" ? '▼' : '⇅'
-                )), */
-              ]);
-            }
-          })
-        ),
-        valueFormatter: (params: ValueFormatterParams) => {
-          return params.data[col];
-        },
-      });
-    }
-  }
-
   const collapsedDataExtractedColumns: ColDef[] = ColumnManager.UsableColumns.getAllSingleLevelColumns()
-    .filter(col => col.shouldDisplay)
+    .filter(col => {
+      return col.shouldDisplay && !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)
+    })
     .map(col => ({
       field: col.effectiveLookupPath[0],
       headerName: col.displayString,
-      headerClass: 'my-ag-table-collapsible-data-expanded-column',
+      headerClass: col.derivedFromColumn == null
+      ? 'my-ag-table-collapsible-data-expanded-column'
+      : 'my-ag-table-collapsible-data-expanded-column my-ag-table-is-derived-column',
       cellClass: 'my-ag-table-collapsible-data-expanded-cell',
-      cellRenderer: selectRenderer(col.effectiveLookupPath[0]).cellRenderer,
-      headerComponent: expandedCollapsibleDataColumnHeader,
+      cellRenderer: selectRenderer(
+        col.serializedEffectiveLookupPath,
+        col.apparentLookupPath,
+        col.displayString
+      ).cellRenderer,
+      headerComponent: expandableCollapsibleDataColumnHeader,
       headerComponentParams: {
         key: col.effectiveLookupPath[0],
       },
+      valueFormatter: (params: ValueFormatterParams) => {
+        if (col.derivedFromColumn == null) {
+          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(col.serializedEffectiveLookupPath)) {
+            return coerceToNumber(params.value) ?? "";
+          }
+        } else {
+          return params.data[col.apparentLookupPath] ?? "";
+        }
+        return ""
+      },
     }));
 
-    const expandableDataExtractedColumns: ColDef[] = Array.from(expandableDataManager.getVisibleKeys())
-    .sort((a, b) => a.localeCompare(b))
-    .map(key => {
-      const fullKey = `${ColumnManager.EXPANDABLE_DATA_COLUMN}.${key}`
-        return {
-        field: fullKey,
-        headerName: key,
-        headerClass: 'my-ag-table-expandable-data-expanded-column',
+    const expandableDataExtractedColumns: ColDef[] = ColumnManager.UsableColumns.getAllNestedDepthColumns()
+    .filter(col => col.shouldDisplay)
+    .sort((a, b) => a.displayString.localeCompare(b.displayString))
+    .map(colKey => {
+      return {
+        field: ColumnManager.EXPANDABLE_DATA_COLUMN,
+        headerName: colKey.displayString,
+        headerClass: colKey.derivedFromColumn == null
+        ? 'my-ag-table-expandable-data-expanded-column'
+        : 'my-ag-table-expandable-data-expanded-column my-ag-table-is-derived-column',
         cellClass: 'my-ag-table-expandable-data-expanded-cell',
-        headerComponent: expandedPayloadColumnHeader,
+        headerComponent: expandableCollapsibleDataColumnHeader,
         headerComponentParams: {
-          key: key,
+          key: colKey,
         },
         valueFormatter: (params: ValueFormatterParams) => {
-          const subKey = ColumnManager.getExpandableDataColumnSubKey(key);
-          const value = params.data[ColumnManager.EXPANDABLE_DATA_COLUMN][subKey];
-          console.log("CHECK KEY", key, subKey, fullKey);
-          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(fullKey)) {
-            console.log("COERCE", value);
-            return coerceToNumber(value);
+          // WARN: assuming 1 level of nesting for now
+          // WARN: the ?? part is _probably_ when the expanded data is visible
+          const value = params.data?.[ColumnManager.EXPANDABLE_DATA_COLUMN][colKey.serializedEffectiveLookupPath] ?? params.value?.[colKey.apparentLookupPath];
+          if (ColumnManager.ColumnTypeTracker.coerceToNumberColumns.value.has(colKey.serializedEffectiveLookupPath)) {
+            return coerceToNumber(value) ?? "";
           }
-          return value;
+          return value ?? "";
         },
-        cellRenderer: selectRenderer(key).cellRenderer,
+        cellRenderer: selectRenderer(
+          colKey.serializedEffectiveLookupPath,
+          colKey.apparentLookupPath,
+          colKey.displayString
+        ).cellRenderer,
       }
     });
 
@@ -941,7 +994,6 @@ const updateColumnDefs = () => {
       width: 40,
     },
     ...baseColumns,
-    ...derivedColumns,
     ...collapsedDataExtractedColumns,
     ...(totalExpandableRows.value > 0 ? [{
       field: ColumnManager.EXPANDABLE_DATA_COLUMN, 
@@ -960,17 +1012,17 @@ const updateColumnDefs = () => {
           return () => h('div', { class: 'my-ag-table-expandable-data-header' }, [
             h('div', {}, [
               h('div', { class: 'ag-header-cell-text' },
-                expandableDataManager.expandableDataUnexpandedKeys.value.size == 0 ? "" : params.displayName
+                ColumnManager.UsableColumns.getTotalHiddenNestedDepthColumns() == 0 ? "" : params.displayName
               ),
             ]),
             h('div', { class: 'button-container' }, [
               h('div', {}, [
-                expandableDataManager.expandedExpandableDataKeys.value.size > 0 && h('button', {
+                ColumnManager.UsableColumns.getTotalVisibleNestedDepthColumns() > 0 && h('button', {
                   class: 'ag-my collapse all',
                   title: 'Collapse all',
                   onClick: contractAllExpandableRows
                 }, '◀'),
-                expandableDataManager.expandableDataUnexpandedKeys.value.size > 0 && h('button', {
+                ColumnManager.UsableColumns.getTotalHiddenNestedDepthColumns() > 0 && h('button', {
                   class: 'ag-my expand all',
                   title: 'Expand all',
                   onClick: expandAllExpandableRows
@@ -987,38 +1039,30 @@ const updateColumnDefs = () => {
 };
 
 const toggleExpandExpandableKeys = (rowIndex: number) => {
-  if (expandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
-    expandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
+  if (ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.has(rowIndex)) {
+    ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.delete(rowIndex);
   } else {
-    expandableDataManager.expandedExpandableDataRows.value.add(rowIndex);
+    ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.add(rowIndex);
     const row = rowData.value[rowIndex];
-    if (row) {
-
-      if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-
-          expandableDataManager.expandedExpandableDataKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key));
-          expandableDataManager.expandableDataUnexpandedKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(key));
-        });
-      }
+    if (row && row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
+      Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
+        ColumnManager.UsableColumns.setDisplayOn([ColumnManager.EXPANDABLE_DATA_COLUMN, key]);
+      });
     }
   }
   updateColumnDefs();
 };
 
 const toggleContractExpandableKeys = (rowIndex: number) => {
-  if (!expandableDataManager.expandedExpandableDataRows.value.has(rowIndex)) {
+  if (!ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.has(rowIndex)) {
     return;
   } else {
-    expandableDataManager.expandedExpandableDataRows.value.delete(rowIndex);
+    ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.delete(rowIndex);
     const row = rowData.value[rowIndex];
-    if (row) {
-      if (row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
-        Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
-          expandableDataManager.expandedExpandableDataKeys.value.delete(ColumnManager.makeExpandableDataColumnKey(key));
-          expandableDataManager.expandableDataUnexpandedKeys.value.add(ColumnManager.makeExpandableDataColumnKey(key));
-        });
-      }
+    if (row && row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
+      Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
+        ColumnManager.UsableColumns.setDisplayOff([ColumnManager.EXPANDABLE_DATA_COLUMN, key]);
+      });
     }
   }
   updateColumnDefs();
@@ -1034,7 +1078,7 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
     if (row) {
       console.log("row", row);
       Object.keys(row).filter(
-        key => !ColumnManager.CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
+        key => !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
       ).forEach(key => {
         ColumnManager.UsableColumns.setDisplayOn([key]);
       });
@@ -1061,10 +1105,8 @@ const restoreAllCollapsedRows = () => {
 const collapseAllCollapsibleRows = () => {
 
   ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = false);
+  collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
 
-
-  // collapsibleDataManager.collapsibleDataExpandedRows.value.clear();
-  // collapsibleDataManager.resetKeys();
   updateColumnDefs();
 };
 
@@ -1075,21 +1117,23 @@ const expandAllExpandableRows = () => {
     if (row.payload) {
       const payloadKeys = Object.keys(row.payload);
       if (payloadKeys.length > 0) {
-        expandableDataManager.expandedExpandableDataRows.value.add(row.id);
-        payloadKeys.forEach(key => expandableDataManager.expandedExpandableDataKeys.value.add(key));
+        ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.add(row.id);
+        payloadKeys.forEach(key => {
+          ColumnManager.UsableColumns.setDisplayOn([ColumnManager.EXPANDABLE_DATA_COLUMN, key]);
+        });
+
         isDirty = true;
       }
     }
   });
   if (isDirty) {
-    expandableDataManager.expandableDataUnexpandedKeys.value.clear();
     updateColumnDefs();
   }
 };
 
 const contractAllExpandableRows = () => {
-  expandableDataManager.expandedExpandableDataKeys.value.clear();
-  expandableDataManager.resetKeys();
+  ColumnManager.UsableColumns.getAllNestedDepthColumns().forEach(col => col.shouldDisplay = false);
+  ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.clear();
   updateColumnDefs();
 };
 
@@ -1131,16 +1175,22 @@ onMounted(() => {
 
 
 import * as Plotly from 'plotly.js-dist';
+import { parse } from 'vue/compiler-sfc';
 const plotContainer = ref(null);
 
 interface PlotSettings {
-  xColumn: string | null;
-  yColumn: string | null;
+  xColumn: ColumnKey | null;
+  yColumn: ColumnKey | null;
 }
 const plotSettings = ref<PlotSettings>({
   xColumn: null,
   yColumn: null,
 });
+
+// MOVEME
+function _getIn(obj: any, path: string[]) {
+  return path.reduce((acc, key) => acc && acc[key], obj);
+}
 
 const togglePlot = (event: Event) => {
   const isChecked = (event.target as HTMLInputElement).checked;
@@ -1186,14 +1236,20 @@ const togglePlot = (event: Event) => {
   const Y: any[] = [];
 
   for(const row of rowData.value) {
+    console.log("row", row);
     // SUPER DUPER RISKY AND DIRTY
     X.push(ColumnManager.parseTimeValue(
-      row[plotSettings.value.xColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.xColumn]
+      _getIn(row, plotSettings.value.xColumn.effectiveLookupPath)
+      // row[plotSettings.value.xColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.xColumn]
     ));
     Y.push(
-      row[plotSettings.value.yColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.yColumn]
+      _getIn(row, plotSettings.value.yColumn.effectiveLookupPath)
+      // row[plotSettings.value.yColumn] ?? row[ColumnManager.EXPANDABLE_DATA_COLUMN]?.[plotSettings.value.yColumn]
     );
   }
+
+  console.log("X", plotSettings.value.xColumn, X);
+  console.log("Y", plotSettings.value.yColumn, Y);
 
   const plot = new Plotly.newPlot(plotContainer.value, [{
     x: X,
@@ -1231,8 +1287,6 @@ const dataSource: IDatasource = {
   getRows: async (params) => {
     const { startRow, endRow, successCallback, failCallback } = params;
     
-    expandableDataManager.clearAll();
-
     try {
       const limit = endRow - startRow;
       const result = await loadRemoteData(startRow, limit);
