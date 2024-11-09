@@ -2,7 +2,7 @@
     <div class="time-cell"
     :style="{ background: backgroundColor }"
     >
-        {{ myDate?.toISOString() }}
+      {{ myDate != null ? myDate.toISOString() : "" }}
     </div>
 </template>
 
@@ -24,7 +24,8 @@ const props = defineProps<{
 }>();
 
 const myDate = computed(() => {
-  return parseTimeValue(props.params.value);
+  const maybeTimeValue = props.params.valueFormatted;
+  return maybeTimeValue != null && maybeTimeValue != "" ? parseTimeValue(maybeTimeValue) : null;
 });
 
 interface TimeBreakpoints {

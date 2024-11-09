@@ -685,7 +685,11 @@ function makeExpandedColumnHeader() {
       const sortOrder = ref(params.column.getSort());
 
       const collapseKey = () => {
-        ColumnManager.UsableColumns.setDisplayOff([params.key]);
+        const columnKeyLookupPath = typeof params.key == 'string'
+        ? [params.key]
+        : params.key.effectiveLookupPath;
+        console.log(`%ccollapsekey: %c${columnKeyLookupPath}`, 'color: gold; font-weight: bold;', 'color: blue; font-weight: bold; font-size: 18pt;');
+        ColumnManager.UsableColumns.setDisplayOff(columnKeyLookupPath);
         updateColumnDefs();
       };
 
@@ -767,8 +771,8 @@ const updateColumnDefs = () => {
       headerName: 'Expandable Data String (not shown; for filtering)', 
       hide: true 
     },
-
-    [ColumnManager.COLLAPSABLE_DATA_COLUMN]: { 
+    [ColumnManager.COLLAPSABLE_DATA_COLUMN]: {
+      // hide: true,
       field: ColumnManager.COLLAPSABLE_DATA_COLUMN, 
       headerName: ColumnManager.UsableColumns.getTotalCollapsedCountString(),
       width: 200,
@@ -821,6 +825,13 @@ const updateColumnDefs = () => {
         field: nativePath,
         headerName: humanReadablePath ?? serializedPath,
         cellRenderer: 'timeCellRenderer',
+        valueFormatter: (params: ValueFormatterParams) => {
+          if(columnKey.effectiveLookupPath[0] == ColumnManager.EXPANDABLE_DATA_COLUMN) {
+            return params.value[columnKey.apparentLookupPath];
+          } else {
+            return params.value;
+          }
+        },
       }
     } else if (columnKey.renderType == ColumnRendererType.CATEGORICAL) {
       return {
@@ -918,8 +929,11 @@ const updateColumnDefs = () => {
             const value = params.data?.[ColumnManager.EXPANDABLE_DATA_COLUMN][colKey.serializedEffectiveLookupPath] ?? params.value?.[colKey.apparentLookupPath];
             if (colKey.transformations?.includes(ColumnTransformation.NUMBER)) {
               return coerceToNumber(value) ?? "";
+            } else if (colKey.renderType == ColumnRendererType.TIME) {
+              return value;
+            } else {
+              return value ?? "";
             }
-            return value ?? "";
           }
         },
         cellRenderer: selectRenderer(colKey).cellRenderer,
@@ -1034,7 +1048,14 @@ const restoreAllCollapsedRows = () => {
 };
 
 const collapseAllCollapsibleRows = () => {
-  ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(col => col.shouldDisplay = false);
+  ColumnManager.UsableColumns.getAllSingleLevelColumns().forEach(
+    col => {
+      if(ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)) {
+        return;
+      }
+      col.shouldDisplay = false
+    }
+  );
   updateColumnDefs();
 };
 

@@ -193,6 +193,7 @@ export interface RenderParams {
     data?: any;
     value?: any;
     colDef?: ColDef;
+    valueFormatted?: string;
     coreDisplayParams: Set<string>;
 
     toggleExpandCollapsibleKeys: (rowIndex: number) => void;
@@ -256,17 +257,21 @@ export function parseValueWithUnitSuffix(value: string, shouldForceLowerCaseUnit
     };
 }
 
-export function parseTimeValue(value: string | number | null): Date | null {
-    if (value == null) return null;
-    if (typeof value === 'number') {
-        // check if this should be adjusted
-        const maybeFutureDate = value * 1000;
-        if (Math.log10(maybeFutureDate) < 13.5) {
-            return new Date(maybeFutureDate);
+export function parseTimeValue(value: string | number | null | undefined): Date | null {
+    if (value == null || value == undefined || value == "") return null;
+    try {
+        if (typeof value === 'number') {
+            // check if this should be adjusted
+            const maybeFutureDate = value * 1000;
+            if (Math.log10(maybeFutureDate) < 13.5) {
+                return new Date(maybeFutureDate);
+            } else {
+                return new Date(value);
+            }
         } else {
             return new Date(value);
         }
-    } else {
-        return new Date(value);
+    } catch (e) {
+        return null;
     }
 }
