@@ -231,18 +231,20 @@ async function loadFile() {
   const text = await file.text();
   const lines = text.split('\n');
 
+  const parsedRows: any[] = [];
   for (const line of lines) {
     if (line.trim() !== '') {
       try {
         const parsedLine = JSON.parse(line);
-        tableRowsCache.value.push(parsedLine);
+        parsedRows.push(parsedLine);
       } catch (error) {
         console.error('Error parsing line:', line);
         console.error(error);
       }
     }
   }
-  console.log('fileCache length:', tableRowsCache.value.length);
+  console.log('fileCache length:', parsedRows.length);
+  tableRowsCache.value = parsedRows;
 }
 
 

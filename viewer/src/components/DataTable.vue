@@ -794,7 +794,11 @@ const updateColumnDefs = () => {
             ]),
             h('div', { class: 'button-container' }, [
               h('div', {}, [
-                ColumnManager.UsableColumns.getTotalVisibleSingleLevelColumns() > 0 && h('button', {
+                Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(
+                  col => {
+                    return col.shouldDisplay && !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(col.serializedEffectiveLookupPath)
+                  }
+                ).length > 0 && h('button', {
                   class: 'ag-my-collapse-all',
                   title: 'Collapse all',
                   onClick: collapseAllCollapsibleRows
@@ -896,11 +900,15 @@ const updateColumnDefs = () => {
         if (col.derivedFromColumn == null) {
           if (col.transformations?.includes(ColumnTransformation.NUMBER)) {
             return coerceToNumber(params.value) ?? "";
-          } else {
-            return params.value ?? "";
           }
+        }
+        const value = params.data[col.apparentLookupPath];
+        if(value === true) {
+          return "✔️";
+        } else if(value === false) {
+          return "❌";
         } else {
-          return params.data[col.apparentLookupPath] ?? "";
+          return value?.toString() ?? "";
         }
       },
     }));

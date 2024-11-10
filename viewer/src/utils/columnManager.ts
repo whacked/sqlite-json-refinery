@@ -269,7 +269,7 @@ export function parseTimeValue(value: string | number | null | undefined): Date 
                 return new Date(value);
             }
         } else {
-            return new Date(value);
+            return new Date(value.replace("T", " ").replace("--", "-"));
         }
     } catch (e) {
         return null;
