@@ -1,0 +1,77 @@
+{
+  "description": "cli commands and parameters",
+  "properties": {
+    "add-schema": {
+      "properties": {
+        "content": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "add-transformer": {
+      "properties": {
+        "content": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "apply-transform": {
+      "properties": {
+        "spec": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "connect": {
+      "properties": {
+        "mqtt-host": {
+          "default": "localhost",
+          "description": "MQTT host for connection",
+          "type": "string"
+        },
+        "mqtt-port": {
+          "default": 1883,
+          "description": "MQTT port for connection",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "list-payloads": {
+      "properties": {
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "list-schemas": {
+      "type": "boolean"
+    },
+    "list-transformers": {
+      "type": "boolean"
+    },
+    "serve-jsonl": {
+      "properties": {
+        "port": {
+          "default": 8080,
+          "description": "port to serve JSONL on",
+          "type": "integer"
+        },
+        "source": {
+          "description": "path to JSONL file to serve",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "summary": {
+      "type": "boolean"
+    }
+  },
+  "title": "CliCommands",
+  "type": "object"
+}

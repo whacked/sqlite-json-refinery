@@ -7,7 +7,9 @@ update-jdxd:
 schemas/%.schema.json: generators/%.schema.jsonnet
 	jsonnet $< | jq -S | tee $@
 
-schemas: schemas/CommonPayloadData.schema.json schemas/Transformations.schema.json
+schemas: schemas/CommonPayloadData.schema.json \
+	schemas/Transformations.schema.json \
+	schemas/CliCommands.schema.json
 
 common_payload_data.go: schemas/CommonPayloadData.schema.json
 	go-jsonschema --tags json -t -p main $< | \
@@ -17,4 +19,8 @@ common_payload_data.go: schemas/CommonPayloadData.schema.json
 transformations.go: schemas/Transformations.schema.json
 	go-jsonschema --tags json -t -p main $< | \
 		sed 's/\*int/\*int64/g' | \
+		tee $@
+
+cli_commands.go: schemas/CliCommands.schema.json
+	go-jsonschema --tags json -t -p main $< | \
 		tee $@

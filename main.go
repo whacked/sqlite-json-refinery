@@ -9,11 +9,15 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
+	_ "embed"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -22,6 +26,9 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+//go:embed schemas/CliCommands.schema.json
+var cliCommandsJson string
 
 func initializeDatabase(db *sql.DB) error {
 	_, err := db.Exec(schemaSql)
@@ -46,13 +53,14 @@ func checkIfTransformationExists(db *sql.DB, inputId int64, transformerId int64)
 }
 
 func insertTransformation(db *sql.DB, transformation *Transformations) error {
-	fmt.Printf("Inserting transformation with input data id: %d, input schema id: %d, transformer id: %d, output schema id: %d, output id: %d\n",
+	fmt.Printf("Inserting transformation with input data id: %d, input schema id: %d, transformer id: %d, output schema id: %d, output id: %d, time executed: %f\n",
 		*transformation.InputId,
 		*transformation.InputSchemaId,
 		*transformation.TransformerId,
 		*transformation.OutputSchemaId,
 		*transformation.OutputId,
-		*transformation.TimeExecuted)
+		*transformation.TimeExecuted,
+	)
 	_, err := db.Exec(`
 		INSERT INTO Transformations (input_id, input_schema_id, transformer_id, output_schema_id, output_id, time_executed)
 		VALUES (?, ?, ?, ?, ?, ?)
@@ -269,21 +277,180 @@ type Config struct {
 	InputSchemaID       int
 	OutputTransformerID int
 	OutputSchemaID      int
+	tempThing           *CliCommands
 }
 
-var subcommands = []string{
-	"connect",
-	"add-schema",
-	"add-transformer",
-	"summary",
-	"list-payloads",
-	"list-schemas",
-	"list-transformers",
-	"apply-transform",
+// Create a map from command strings to struct fields
+// returns the json tag ==> type mapping
+func buildCommandMapping(commands *CliCommands) map[string]interface{} {
+	mapping := make(map[string]interface{})
+	val := reflect.ValueOf(commands).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		jsonTag := field.Tag.Get("json")
+		// fmt.Println("(processing field)", i, field, jsonTag)
+		if jsonTag != "" {
+			// Strip `omitempty` or other modifiers from the tag
+			jsonKey := jsonTag
+			if commaIdx := strings.Index(jsonTag, ","); commaIdx != -1 {
+				jsonKey = jsonTag[:commaIdx]
+			}
+			fieldValue := val.Field(i).Interface()
+			// Get the type to instantiate - for pointers, use the element type
+			targetType := reflect.TypeOf(fieldValue)
+			if targetType.Kind() == reflect.Ptr {
+				targetType = targetType.Elem()
+			}
+			instance := reflect.New(targetType).Interface()
+			// fmt.Printf("ADDING INSTANCE: %s -> %v\n", jsonKey, instance)
+			mapping[jsonKey] = instance
+		}
+	}
+
+	return mapping
+}
+
+func setupFlags(commandMapping map[string]interface{}, cliCommandsJsonData map[string]interface{}, attribute string, flagSet *flag.FlagSet) {
+
+	subCommandMapping := commandMapping[attribute]
+	val := reflect.ValueOf(subCommandMapping).Elem()
+	typ := val.Type()
+
+	// fmt.Printf("subCommandMapping for [%s]: %+v\n", attribute, typ)
+
+	attributeSchema := cliCommandsJsonData["properties"].(map[string]interface{})[attribute].(map[string]interface{})
+	// bail if the attribute schema is not type == object
+	if attributeSchema["type"] != "object" {
+
+		switch attributeSchema["type"] {
+		case "boolean":
+			defaultValue := true // true because user passed in the flag
+			flagSet.BoolVar(&defaultValue, attribute, defaultValue, "")
+			return
+		}
+		fmt.Printf("Attribute %s is not an object; it is %s\n", attribute, attributeSchema["type"])
+
+		return
+	}
+
+	// check if it has the attribute "properties"
+	if _, ok := attributeSchema["properties"]; !ok {
+		fmt.Printf("No properties found for attribute: %s\n", attribute)
+		return
+	}
+
+	attributeSchemaProperties := attributeSchema["properties"].(map[string]interface{})
+	if len(attributeSchemaProperties) == 0 {
+		fmt.Printf("No properties found for attribute: %s\n", attribute)
+		return
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+
+		field := typ.Field(i)
+		jsonTag := field.Tag.Get("json")
+		if commaIdx := strings.Index(jsonTag, ","); commaIdx != -1 {
+			jsonTag = jsonTag[:commaIdx]
+		}
+		if jsonTag == "" {
+			continue
+		}
+
+		subPropertySchema := attributeSchemaProperties[jsonTag].(map[string]interface{})
+		maybeDescription := subPropertySchema["description"]
+		description := ""
+		if maybeDescription != nil {
+			description = maybeDescription.(string)
+		}
+
+		switch field.Type.Kind() {
+		case reflect.String:
+			defaultValue := subPropertySchema["default"]
+			flagSet.StringVar(val.Field(i).Addr().Interface().(*string), jsonTag, defaultValue.(string), description)
+		case reflect.Int:
+			defaultValue := subPropertySchema["default"]
+			// coerce the default value to an int; the json read-in yields a float64
+			defaultInt := int(defaultValue.(float64))
+			flagSet.IntVar(val.Field(i).Addr().Interface().(*int), jsonTag, defaultInt, description)
+		case reflect.Bool:
+			defaultValue := subPropertySchema["default"]
+			flagSet.BoolVar(val.Field(i).Addr().Interface().(*bool), jsonTag, defaultValue.(bool), description)
+		case reflect.Ptr:
+			// For pointer fields, we need to get the pointer to the pointer field
+			// This handles cases like *string in the struct
+			defaultValue := ""
+			if def, ok := subPropertySchema["default"]; ok {
+				defaultValue = def.(string)
+			}
+			// Get pointer to the *string field
+			ptrToPtr := val.Field(i).Addr().Interface().(**string)
+			// Create storage for the string value
+			*ptrToPtr = new(string)
+			// Pass the pointer to the string value to flagSet
+			flagSet.StringVar(*ptrToPtr, jsonTag, defaultValue, description)
+		default:
+			fmt.Printf("-- Unsupported flag type for field %s, type %s\n", field.Name, field.Type.Kind())
+		}
+	}
 }
 
 func parseCommandLine() Config {
+	commands := &CliCommands{}
+	commandMapping := buildCommandMapping(commands)
+
+	var cliCommandsJsonData map[string]interface{}
+	json.Unmarshal([]byte(cliCommandsJson), &cliCommandsJsonData)
+	// fmt.Printf("=== cliCommandsJsonData: %+v\n", cliCommandsJsonData)
+
+	// Create a map of subcommands to their FlagSets
+	subCommandFlags := make(map[string]*flag.FlagSet)
+	// Initialize FlagSets for each subcommand
+	for cmdName := range commandMapping {
+		subCommandFlags[cmdName] = flag.NewFlagSet(cmdName, flag.ExitOnError)
+
+		if cmdName == "serve-jsonl" {
+			fmt.Printf("serve-jsonl flags: %+v\n", subCommandFlags[cmdName])
+			// Create storage for the string value and assign it to the pointer field
+			commands.ServeJsonl = new(CliCommandsServeJsonl)
+			commands.ServeJsonl.Source = new(string)
+			subCommandFlags[cmdName].StringVar(commands.ServeJsonl.Source, "source", "", "path to JSONL file to serve")
+		} else {
+			setupFlags(commandMapping, cliCommandsJsonData, cmdName, subCommandFlags[cmdName])
+		}
+	}
+
+	/*
+		// Set up flags for each subcommand
+		if connectCmd, ok := subcommandFlags["connect"]; ok {
+			fmt.Printf("mapping: %+v\n", commandMapping)
+			setupFlags(commandMapping, cliCommandsJsonData, "connect", connectCmd)
+		}
+
+		if addSchemaCmd, ok := subcommandFlags["add-schema"]; ok {
+			setupFlags(commandMapping, cliCommandsJsonData, "add-schema", addSchemaCmd)
+			// addSchemaCmd.StringVar(&cfg.Content, "content", "", "File path, raw JSON, or '-' for stdin")
+		}
+
+		if addTransformerCmd, ok := subcommandFlags["add-transformer"]; ok {
+			setupFlags(commandMapping, cliCommandsJsonData, "add-transformer", addTransformerCmd)
+			// addTransformerCmd.StringVar(&cfg.Content, "content", "", "File path, raw string, or '-' for stdin")
+		}
+
+		if listPayloadsCmd, ok := subcommandFlags["list-payloads"]; ok {
+			setupFlags(commandMapping, cliCommandsJsonData, "list-payloads", listPayloadsCmd)
+			// listPayloadsCmd.StringVar(&cfg.Type, "type", "raw", "Payload type (schema, transformer, raw)")
+		}
+
+		if applyTransformCmd, ok := subcommandFlags["apply-transform"]; ok {
+			setupFlags(commandMapping, cliCommandsJsonData, "apply-transform", applyTransformCmd)
+			// applyTransformCmd.StringVar(&cfg.Spec, "spec", "", "Transform specification in the shape of input:inputSchemaID/outputTransformerID:outputSchemaID")
+		}
+	*/
+
 	cfg := Config{}
+	cfg.tempThing = commands
 
 	// Set up the database flag
 	dbDefault := ":memory:"
@@ -298,7 +465,12 @@ func parseCommandLine() Config {
 		fmt.Fprintf(os.Stderr, "Global options:\n")
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nSubcommands:\n")
-		for _, cmd := range subcommands {
+		subCommandKeys := make([]string, 0, len(commandMapping))
+		for cmd := range commandMapping {
+			subCommandKeys = append(subCommandKeys, cmd)
+		}
+		sort.Strings(subCommandKeys)
+		for _, cmd := range subCommandKeys {
 			fmt.Fprintf(os.Stderr, "  %s\n", cmd)
 		}
 		fmt.Fprintf(os.Stderr, "\nUse '%s <subcommand> -h' for more information about a subcommand.\n", os.Args[0])
@@ -315,51 +487,123 @@ func parseCommandLine() Config {
 		flag.Usage()
 		os.Exit(1)
 	}
+	/*
+
+
+			// debug print all args detected by flag
+			fmt.Printf("Args: %v\n", flag.Args())
+			// Parse the subcommand's flags
+			if subCmdParser, ok := subcommandFlags[subCommand]; ok {
+				subCmdParser.Parse(flag.Args()[1:])
+			} else {
+				fmt.Printf("Unknown subcommand: %s\n", subCommand)
+				flag.Usage()
+				os.Exit(1)
+			}
+
+			// Set up the database flag
+			dbDefault := ":memory:"
+			if envDB := os.Getenv("DATABASE_PATH"); envDB != "" {
+				dbDefault = envDB
+			}
+			flag.StringVar(&cfg.Database, "database", dbDefault, "Database path")
+
+			fmt.Println("OK?")
+			flag.Usage()
+
+			os.Exit(0)
+
+			// Add a custom usage function
+			flag.Usage = func() {
+				fmt.Fprintf(os.Stderr, "Usage: %s [global options] <subcommand> [subcommand options]\n\n", os.Args[0])
+				fmt.Fprintf(os.Stderr, "Global options:\n")
+				flag.PrintDefaults()
+				fmt.Fprintf(os.Stderr, "\nSubcommands:\n")
+				for _, cmd := range subcommands {
+					fmt.Fprintf(os.Stderr, "  %s\n", cmd)
+				}
+				fmt.Fprintf(os.Stderr, "\nUse '%s <subcommand> -h' for more information about a subcommand.\n", os.Args[0])
+			}
+
+			// Parse the global flags
+			flag.Parse()
+
+			// Print the database path
+			fmt.Printf("Using database: %s\n", cfg.Database)
+
+			// Check if no subcommand was provided or -h was used
+			if len(flag.Args()) < 1 || (len(os.Args) > 1 && os.Args[1] == "-h") {
+				flag.Usage()
+				fmt.Println("OK???")
+				os.Exit(1)
+			}
+
+					// Example: Look up a command
+					command := "add-schema"
+					if field, found := commandMapping[command]; found {
+						fmt.Printf("Command %s matches struct field %+v\n", command, field)
+					} else {
+						fmt.Printf("Command %s not found\n", command)
+					}
+
+
+				cfg.SubCommand = flag.Arg(0)
+
+		// Define subcommands
+		connectCmd := flag.NewFlagSet("connect", flag.ExitOnError)
+		addSchemaCmd := flag.NewFlagSet("add-schema", flag.ExitOnError)
+		addTransformerCmd := flag.NewFlagSet("add-transformer", flag.ExitOnError)
+		summaryCmd := flag.NewFlagSet("summary", flag.ExitOnError)
+		listPayloadsCmd := flag.NewFlagSet("list-payloads", flag.ExitOnError)
+		listSchemasCmd := flag.NewFlagSet("list-schemas", flag.ExitOnError)
+		listTransformersCmd := flag.NewFlagSet("list-transformers", flag.ExitOnError)
+		applyTransformCmd := flag.NewFlagSet("apply-transform", flag.ExitOnError)
+
+		// connect subcommand flags
+		connectCmd.StringVar(&cfg.MQTTHost, "mqtt-host", "localhost", "MQTT broker hostname")
+		connectCmd.IntVar(&cfg.MQTTPort, "mqtt-port", 1883, "MQTT broker port")
+
+		// add-schema and add-transformer subcommand flags
+		addSchemaCmd.StringVar(&cfg.Content, "content", "", "File path, raw JSON, or '-' for stdin")
+		addTransformerCmd.StringVar(&cfg.Content, "content", "", "File path, raw string, or '-' for stdin")
+
+		// list-payloads subcommand flag
+		listPayloadsCmd.StringVar(&cfg.Type, "type", "raw", "Payload type (schema, transformer, raw)")
+
+		// apply-transform subcommand flag
+		applyTransformCmd.StringVar(&cfg.Spec, "spec", "", "Transform specification in the shape of input:inputSchemaID/outputTransformerID:outputSchemaID")
+
+		switch cfg.SubCommand {
+		case "connect":
+			connectCmd.Parse(flag.Args()[1:])
+		case "add-schema":
+			addSchemaCmd.Parse(flag.Args()[1:])
+		case "add-transformer":
+			addTransformerCmd.Parse(flag.Args()[1:])
+		case "summary":
+			summaryCmd.Parse(flag.Args()[1:])
+		case "list-payloads":
+			listPayloadsCmd.Parse(flag.Args()[1:])
+		case "list-schemas":
+			listSchemasCmd.Parse(flag.Args()[1:])
+		case "list-transformers":
+			listTransformersCmd.Parse(flag.Args()[1:])
+		case "apply-transform":
+			applyTransformCmd.Parse(flag.Args()[1:])
+		default:
+			fmt.Printf("Unknown subcommand: %s\n", cfg.SubCommand)
+			flag.Usage()
+			os.Exit(1)
+		}
+	*/
 
 	cfg.SubCommand = flag.Arg(0)
 
-	// Define subcommands
-	connectCmd := flag.NewFlagSet("connect", flag.ExitOnError)
-	addSchemaCmd := flag.NewFlagSet("add-schema", flag.ExitOnError)
-	addTransformerCmd := flag.NewFlagSet("add-transformer", flag.ExitOnError)
-	summaryCmd := flag.NewFlagSet("summary", flag.ExitOnError)
-	listPayloadsCmd := flag.NewFlagSet("list-payloads", flag.ExitOnError)
-	listSchemasCmd := flag.NewFlagSet("list-schemas", flag.ExitOnError)
-	listTransformersCmd := flag.NewFlagSet("list-transformers", flag.ExitOnError)
-	applyTransformCmd := flag.NewFlagSet("apply-transform", flag.ExitOnError)
-
-	// connect subcommand flags
-	connectCmd.StringVar(&cfg.MQTTHost, "mqtt-host", "localhost", "MQTT broker hostname")
-	connectCmd.IntVar(&cfg.MQTTPort, "mqtt-port", 1883, "MQTT broker port")
-
-	// add-schema and add-transformer subcommand flags
-	addSchemaCmd.StringVar(&cfg.Content, "content", "", "File path, raw JSON, or '-' for stdin")
-	addTransformerCmd.StringVar(&cfg.Content, "content", "", "File path, raw string, or '-' for stdin")
-
-	// list-payloads subcommand flag
-	listPayloadsCmd.StringVar(&cfg.Type, "type", "raw", "Payload type (schema, transformer, raw)")
-
-	// apply-transform subcommand flag
-	applyTransformCmd.StringVar(&cfg.Spec, "spec", "", "Transform specification in the shape of input:inputSchemaID/outputTransformerID:outputSchemaID")
-
-	switch cfg.SubCommand {
-	case "connect":
-		connectCmd.Parse(flag.Args()[1:])
-	case "add-schema":
-		addSchemaCmd.Parse(flag.Args()[1:])
-	case "add-transformer":
-		addTransformerCmd.Parse(flag.Args()[1:])
-	case "summary":
-		summaryCmd.Parse(flag.Args()[1:])
-	case "list-payloads":
-		listPayloadsCmd.Parse(flag.Args()[1:])
-	case "list-schemas":
-		listSchemasCmd.Parse(flag.Args()[1:])
-	case "list-transformers":
-		listTransformersCmd.Parse(flag.Args()[1:])
-	case "apply-transform":
-		applyTransformCmd.Parse(flag.Args()[1:])
-	default:
+	if subCommandHandler, ok := subCommandFlags[cfg.SubCommand]; ok {
+		fmt.Println("subCommandHandler", cfg.SubCommand, subCommandHandler)
+		fmt.Println("parsing", flag.Args()[1:])
+		subCommandHandler.Parse(flag.Args()[1:])
+	} else {
 		fmt.Printf("Unknown subcommand: %s\n", cfg.SubCommand)
 		flag.Usage()
 		os.Exit(1)
@@ -425,6 +669,12 @@ func main() {
 
 	config := parseCommandLine()
 	fmt.Printf("Parsed configuration: %+v\n", config)
+	// pretty print the parsed configuration
+	b, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	fmt.Print(string(b))
 
 	db, err := sql.Open("sqlite3", config.Database)
 	if err != nil {
@@ -513,7 +763,125 @@ func main() {
 		log.Println("Connected to MQTT broker. Press CTRL+C to exit.")
 		select {}
 
+	case "serve-jsonl":
+		serveJsonl(&config)
+
 	default:
 		log.Fatalf("Unknown subcommand: %s", config.SubCommand)
 	}
+}
+
+func serveJsonl(config *Config) {
+	jsonlSource := *config.tempThing.ServeJsonl.Source
+	fmt.Println("serve jsonl", jsonlSource)
+	// Read the JSONL file into memory
+	file, err := os.Open(jsonlSource)
+	if err != nil {
+		log.Fatalf("Error opening file: %v", err)
+	}
+	defer file.Close()
+
+	var records []map[string]interface{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var record map[string]interface{}
+		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			log.Printf("Error parsing JSON line: %v", err)
+			continue
+		}
+		records = append(records, record)
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Error reading file: %v", err)
+	}
+
+	totalRecords := len(records)
+	log.Printf("Loaded %d records", totalRecords)
+
+	http.HandleFunc("/count", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]int{"count": totalRecords})
+	})
+
+	http.HandleFunc("/records", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		// Check if index parameter is provided for single record retrieval
+		if idx := r.URL.Query().Get("index"); idx != "" {
+			index, err := strconv.Atoi(idx)
+			if err != nil {
+				http.Error(w, "Invalid index parameter", http.StatusBadRequest)
+				return
+			}
+
+			// Return latest record if index is -1
+			if index == -1 {
+				index = totalRecords - 1
+			}
+
+			if index < 0 || index >= totalRecords {
+				json.NewEncoder(w).Encode(nil)
+				return
+			}
+
+			json.NewEncoder(w).Encode(records[index])
+			return
+		}
+
+		// Handle limit/offset pagination
+		limit := 10 // Default limit
+		offset := 0 // Default offset
+
+		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+
+		if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+			if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+				offset = o
+			}
+		}
+
+		// If no parameters provided, return last page
+		if r.URL.Query().Get("limit") == "" && r.URL.Query().Get("offset") == "" {
+			offset = totalRecords - limit
+			if offset < 0 {
+				offset = 0
+			}
+		}
+
+		end := offset + limit
+		if end > totalRecords {
+			end = totalRecords
+		}
+
+		if offset >= totalRecords {
+			json.NewEncoder(w).Encode([]map[string]interface{}{})
+			return
+		}
+
+		json.NewEncoder(w).Encode(records[offset:end])
+	})
+
+	port := 8080
+	if config.tempThing.ServeJsonl.Port != 0 {
+		port = config.tempThing.ServeJsonl.Port
+	}
+
+	log.Printf("Starting server on port %d", port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
+
 }
