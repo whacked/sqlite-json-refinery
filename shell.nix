@@ -61,6 +61,7 @@ in pkgs.mkShell {
     pkgs.go
     pkgs.sqlite
     go-jsonschema
+    pkgs.oapi-codegen
 
     ws4sqlite  # Added here
   ] ++ [

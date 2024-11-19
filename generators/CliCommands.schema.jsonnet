@@ -3,7 +3,6 @@
   type: 'object',
   description: 'cli commands and parameters',
   properties: {
-    /*
     connect: {
       type: 'object',
       properties: {
@@ -60,7 +59,6 @@
         },
       },
     },
-    */
     'serve-jsonl': {
       type: 'object',
       properties: {

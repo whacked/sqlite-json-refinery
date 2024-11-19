@@ -1,0 +1,154 @@
+{
+  "components": {
+    "schemas": {
+      "Error": {
+        "properties": {
+          "code": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "Record": {
+        "type": "object"
+      },
+      "Records": {
+        "items": {
+          "$ref": "#/components/schemas/Record"
+        },
+        "type": "array"
+      }
+    }
+  },
+  "info": {
+    "license": {
+      "name": "MIT"
+    },
+    "title": "JSONL Server",
+    "version": "1.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/count": {
+      "get": {
+        "operationId": "countRecords",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {}
+            },
+            "description": "total number of records",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "unexpected error"
+          }
+        },
+        "summary": "Count all records",
+        "tags": []
+      }
+    },
+    "/records": {
+      "get": {
+        "operationId": "listRecords",
+        "parameters": [
+          {
+            "description": "Number of records to return",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of records to skip",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Records"
+                }
+              }
+            },
+            "description": "paginated list of records"
+          }
+        },
+        "summary": "List paginated records",
+        "tags": []
+      }
+    },
+    "/records/{index}": {
+      "get": {
+        "operationId": "showRecordById",
+        "parameters": [
+          {
+            "description": "The index of the record to retrieve",
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Record"
+                }
+              }
+            },
+            "description": "Expected response to a valid request"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "unexpected error"
+          }
+        },
+        "summary": "Info for a specific record",
+        "tags": []
+      }
+    }
+  },
+  "servers": [
+    {}
+  ]
+}

@@ -9,7 +9,8 @@ schemas/%.schema.json: generators/%.schema.jsonnet
 
 schemas: schemas/CommonPayloadData.schema.json \
 	schemas/Transformations.schema.json \
-	schemas/CliCommands.schema.json
+	schemas/CliCommands.schema.json \
+	schemas/OpenApi.schema.json
 
 common_payload_data.go: schemas/CommonPayloadData.schema.json
 	go-jsonschema --tags json -t -p main $< | \
@@ -24,3 +25,6 @@ transformations.go: schemas/Transformations.schema.json
 cli_commands.go: schemas/CliCommands.schema.json
 	go-jsonschema --tags json -t -p main $< | \
 		tee $@
+
+openapi_interface.go: schemas/OpenApi.schema.json
+	oapi-codegen -generate types,server -package main $< > $@

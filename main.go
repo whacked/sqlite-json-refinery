@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"reflect"
 	"regexp"
@@ -764,124 +763,9 @@ func main() {
 		select {}
 
 	case "serve-jsonl":
-		serveJsonl(&config)
+		ServeJsonl(&config)
 
 	default:
 		log.Fatalf("Unknown subcommand: %s", config.SubCommand)
 	}
-}
-
-func serveJsonl(config *Config) {
-	jsonlSource := *config.tempThing.ServeJsonl.Source
-	fmt.Println("serve jsonl", jsonlSource)
-	// Read the JSONL file into memory
-	file, err := os.Open(jsonlSource)
-	if err != nil {
-		log.Fatalf("Error opening file: %v", err)
-	}
-	defer file.Close()
-
-	var records []map[string]interface{}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var record map[string]interface{}
-		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
-			log.Printf("Error parsing JSON line: %v", err)
-			continue
-		}
-		records = append(records, record)
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("Error reading file: %v", err)
-	}
-
-	totalRecords := len(records)
-	log.Printf("Loaded %d records", totalRecords)
-
-	http.HandleFunc("/count", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		json.NewEncoder(w).Encode(map[string]int{"count": totalRecords})
-	})
-
-	http.HandleFunc("/records", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		// Check if index parameter is provided for single record retrieval
-		if idx := r.URL.Query().Get("index"); idx != "" {
-			index, err := strconv.Atoi(idx)
-			if err != nil {
-				http.Error(w, "Invalid index parameter", http.StatusBadRequest)
-				return
-			}
-
-			// Return latest record if index is -1
-			if index == -1 {
-				index = totalRecords - 1
-			}
-
-			if index < 0 || index >= totalRecords {
-				json.NewEncoder(w).Encode(nil)
-				return
-			}
-
-			json.NewEncoder(w).Encode(records[index])
-			return
-		}
-
-		// Handle limit/offset pagination
-		limit := 10 // Default limit
-		offset := 0 // Default offset
-
-		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-				limit = l
-			}
-		}
-
-		if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-			if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-				offset = o
-			}
-		}
-
-		// If no parameters provided, return last page
-		if r.URL.Query().Get("limit") == "" && r.URL.Query().Get("offset") == "" {
-			offset = totalRecords - limit
-			if offset < 0 {
-				offset = 0
-			}
-		}
-
-		end := offset + limit
-		if end > totalRecords {
-			end = totalRecords
-		}
-
-		if offset >= totalRecords {
-			json.NewEncoder(w).Encode([]map[string]interface{}{})
-			return
-		}
-
-		json.NewEncoder(w).Encode(records[offset:end])
-	})
-
-	port := 8080
-	if config.tempThing.ServeJsonl.Port != 0 {
-		port = config.tempThing.ServeJsonl.Port
-	}
-
-	log.Printf("Starting server on port %d", port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-		log.Fatalf("Server error: %v", err)
-	}
-
 }
