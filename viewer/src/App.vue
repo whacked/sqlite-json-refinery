@@ -12,6 +12,7 @@
   -->
 
   <button @click="loadFile">Load JSONL File</button>
+  <button @click="exampleLoadRemoteJsonl">Load Remote JSONL</button>
   <button @click="exampleLoadRemoteData">Load Remote Data</button>
   <code>
     {{ tableRowsCache.length }} items in cache
@@ -91,7 +92,7 @@ const colDefs = ref([
 
 import { ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
 import { faker } from '@faker-js/faker';
-import { loadRemoteData } from './stores/remoteDataLoader';
+import { loadRemoteData, loadRemoteJsonl } from './stores/remoteDataLoader';
 
 
 // TODO move this to autogen
@@ -278,6 +279,11 @@ const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWin
     totalRowCount: tableRowsCache.value.length,
   };
 };
+
+const exampleLoadRemoteJsonl = async () => {
+  const data = await loadRemoteJsonl(345, 678);
+  tableRowsCache.value = data.rows;
+}
 
 const exampleLoadRemoteData = async () => {
   const data = await loadRemoteData(345, 678);

@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@faker-js/faker": "^9.0.3",
+    "@openapitools/openapi-generator-cli": "^2.15.3",
     "@types/chroma-js": "^2.4.4",
     "@types/color-hash": "^2.0.0",
     "@vitejs/plugin-vue": "^5.1.4",

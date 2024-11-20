@@ -9,7 +9,7 @@
   },
   servers: [
     {
-      //      "url": "http://petstore.swagger.io/v1"
+      url: 'http://localhost:8080',
     },
   ],
   paths: {

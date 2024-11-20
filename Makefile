@@ -31,3 +31,6 @@ cli_commands.go: schemas/CliCommands.schema.json
 
 openapi_interface.go: schemas/OpenApi.schema.json
 	oapi-codegen -generate types,server -package main $< > $@
+
+viewer/src/openapi-interface.autogen: ./schemas/OpenApi.schema.json
+	./viewer/node_modules/.bin/openapi-generator-cli generate --skip-validate-spec -i $< -g typescript-fetch -o $@

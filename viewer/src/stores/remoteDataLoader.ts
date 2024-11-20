@@ -1,3 +1,5 @@
+import { DefaultApi } from "@/openapi-interface.autogen";
+
 const WS4SQL_SERVER_URL = 'http://localhost:12321';
 const DATABASE_NAME = 'mqtt'
 
@@ -35,6 +37,20 @@ export async function loadRemoteData(
     const rows = rowsResult.results?.[0]?.resultSet;
     return Promise.resolve({
         rows,
+        totalRowCount,
+    });
+}
+
+
+export async function loadRemoteJsonl(
+    offset: number = 0,
+    limit: number = 10,
+) {
+    const api = new DefaultApi();
+    const totalRowCount = await api.countRecords();
+    const rowsResult = await api.listRecords({ offset, limit });
+    return Promise.resolve({
+        rows: rowsResult,
         totalRowCount,
     });
 }
