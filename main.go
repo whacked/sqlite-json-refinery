@@ -685,17 +685,17 @@ func main() {
 	defer db.Close()
 
 	switch config.SubCommand {
-	case "add-schema":
+	case CliConstants_ADD_SCHEMA:
 		if err := addSchemaPayload(db, config.Content); err != nil {
 			log.Fatal(err)
 		}
 
-	case "add-transformer":
+	case CliConstants_ADD_TRANSFORMER:
 		if err := addTransformerPayload(db, config.Content); err != nil {
 			log.Fatal(err)
 		}
 
-	case "summary":
+	case CliConstants_SUMMARY:
 		stats, err := getSummaryStats(db)
 		if err != nil {
 			log.Fatal(err)
@@ -705,27 +705,27 @@ func main() {
 			fmt.Printf("%s: %d\n", payloadType, count)
 		}
 
-	case "list-payloads":
+	case CliConstants_LIST_PAYLOADS:
 		if err := listPayloads(db, config.Type); err != nil {
 			log.Fatal(err)
 		}
 
-	case "list-schemas":
+	case CliConstants_LIST_SCHEMAS:
 		if err := listPayloads(db, "schema"); err != nil {
 			log.Fatal(err)
 		}
 
-	case "list-transformers":
+	case CliConstants_LIST_TRANSFORMERS:
 		if err := listPayloads(db, "transformer"); err != nil {
 			log.Fatal(err)
 		}
 
-	case "apply-transform":
+	case CliConstants_APPLY_TRANSFORM:
 		if err := applyTransform(db, int64(config.InputDataID), int64(config.InputSchemaID), int64(config.OutputTransformerID), int64(config.OutputSchemaID)); err != nil {
 			log.Fatal(err)
 		}
 
-	case "connect":
+	case CliConstants_CONNECT:
 		opts := mqtt.NewClientOptions().AddBroker(fmt.Sprintf("tcp://%s:%d", config.MQTTHost, config.MQTTPort))
 		hostname, _ := os.Hostname()
 		opts.SetClientID(fmt.Sprintf("mqtt-dumper-%s", hostname))
@@ -762,7 +762,7 @@ func main() {
 		log.Println("Connected to MQTT broker. Press CTRL+C to exit.")
 		select {}
 
-	case "serve-jsonl":
+	case CliConstants_SERVE_JSONL:
 		ServeJsonl(&config)
 
 	default:

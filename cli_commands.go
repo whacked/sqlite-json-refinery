@@ -108,3 +108,12 @@ func (j *CliCommandsServeJsonl) UnmarshalJSON(b []byte) error {
 	*j = CliCommandsServeJsonl(plain)
 	return nil
 }
+const CliConstants_ADD_SCHEMA = "add-schema"
+const CliConstants_ADD_TRANSFORMER = "add-transformer"
+const CliConstants_APPLY_TRANSFORM = "apply-transform"
+const CliConstants_CONNECT = "connect"
+const CliConstants_LIST_PAYLOADS = "list-payloads"
+const CliConstants_LIST_SCHEMAS = "list-schemas"
+const CliConstants_LIST_TRANSFORMERS = "list-transformers"
+const CliConstants_SERVE_JSONL = "serve-jsonl"
+const CliConstants_SUMMARY = "summary"

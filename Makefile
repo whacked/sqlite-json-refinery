@@ -23,8 +23,11 @@ transformations.go: schemas/Transformations.schema.json
 		tee $@
 
 cli_commands.go: schemas/CliCommands.schema.json
-	go-jsonschema --tags json -t -p main $< | \
-		tee $@
+	go-jsonschema --tags json -t -p main $< | tee $@
+	# generate constants
+	cat $< | \
+		jq -r '.properties | to_entries | map("const CliConstants_" + (.key | gsub("[^a-zA-Z0-9]"; "_") | ascii_upcase) + " = \"" + .key + "\"") | join("\n")' | \
+		tee -a $@
 
 openapi_interface.go: schemas/OpenApi.schema.json
 	oapi-codegen -generate types,server -package main $< > $@
