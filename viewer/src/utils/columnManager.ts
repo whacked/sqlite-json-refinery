@@ -1,5 +1,5 @@
 import { Ref, ref } from 'vue';
-import { ColDef, IRowNode } from 'ag-grid-community';
+import { ColDef, IDatasource, IRowNode } from 'ag-grid-community';
 
 export const EXPANDABLE_DATA_COLUMN = 'payload';
 export const EXPANDABLE_DATA_COLUMN_SHADOW = 'payloadString';
@@ -269,9 +269,22 @@ export function parseTimeValue(value: string | number | null | undefined): Date 
                 return new Date(value);
             }
         } else {
-            return new Date(value.replace("T", " ").replace("--", "-"));
+            const cleanedValue = value.replace("--", "-");
+            if (cleanedValue.charAt(4) == "T") {
+                return new Date(cleanedValue.replace("T", " "));
+            } else if (cleanedValue.indexOf(".") > 8) {
+                return parseTimeValue(parseFloat(cleanedValue));
+            }
+            return new Date(cleanedValue);
         }
     } catch (e) {
         return null;
     }
+}
+
+
+export interface AgGridDataProvider {
+    isInfinite: boolean;
+    rows?: any[];
+    infiniteDataGetter?: (startRow: number, endRow: number) => Promise<{ rows: any[], totalRowCount: number }>;
 }

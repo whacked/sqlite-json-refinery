@@ -23,11 +23,12 @@
         responses: {
           '200': {
             description: 'total number of records',
-            schema: {
-              type: 'integer',
-            },
             content: {
-              'application/json': {},
+              'application/json': {
+                schema: {
+                  type: 'integer',
+                },
+              },
             },
           },
           default: {

@@ -44,12 +44,13 @@
         "responses": {
           "200": {
             "content": {
-              "application/json": {}
+              "application/json": {
+                "schema": {
+                  "type": "integer"
+                }
+              }
             },
-            "description": "total number of records",
-            "schema": {
-              "type": "integer"
-            }
+            "description": "total number of records"
           },
           "default": {
             "content": {

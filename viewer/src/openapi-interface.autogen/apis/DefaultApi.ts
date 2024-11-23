@@ -32,7 +32,7 @@ export class DefaultApi extends runtime.BaseAPI {
     /**
      * Count all records
      */
-    async countRecordsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+    async countRecordsRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<number>> {
         const queryParameters: any = {};
 
         const headerParameters: runtime.HTTPHeaders = {};
@@ -44,14 +44,19 @@ export class DefaultApi extends runtime.BaseAPI {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.VoidApiResponse(response);
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<number>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
     }
 
     /**
      * Count all records
      */
-    async countRecords(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
-        await this.countRecordsRaw(initOverrides);
+    async countRecords(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<number> {
+        const response = await this.countRecordsRaw(initOverrides);
+        return await response.value();
     }
 
     /**

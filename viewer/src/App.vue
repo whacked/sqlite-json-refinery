@@ -1,49 +1,19 @@
 <template>
-  <!-- hello world table
-  <div class="myblock">
-    <ag-grid-vue
-      :rowData="rowData"
-      :columnDefs="colDefs"
-      style="height: 500px"
-      class="ag-theme-quartz"
-    >
-    </ag-grid-vue>
-  </div>
-  -->
-
   <button @click="loadFile">Load JSONL File</button>
   <button @click="exampleLoadRemoteJsonl">Load Remote JSONL</button>
   <button @click="exampleLoadRemoteData">Load Remote Data</button>
-  <code>
-    {{ tableRowsCache.length }} items in cache
+  <button @click="exampleLoadFiniteFakeData">Load test Data</button>
+  <button @click="loadInfiniteFakeData">Load Infinite Fake Data</button>
+  <button @click="loadInfiniteJsonlData">Load Infinite JSONL Data</button>
+  <code
+    v-if="agGridDataProvider && agGridDataProvider.rows"
+  >
+    {{ Array.from(agGridDataProvider.rows.values()).length }} items in cache
   </code>
   <DataTable
-    v-if="tableRowsCache.length > 0"
-    :rowData="Array.from(tableRowsCache.values())"
-   />
-   <DataTable
-    v-else
-    :rowData="[]"
-   />
-  <label v-if="tableRowsCache.length > 0">
-    <input type="checkbox" v-model="showTestTable" />
-    Show Test Table
-  </label>
-
-  <ag-grid-vue
-    v-if="showTestTable && tableRowsCache.length > 0"
-    class="ag-theme-alpine"
-    style="height: 500px; width: 100%;"
-
-    :columnDefs="columnDefs2"
-    :rowModelType="'infinite'"
-    :cacheBlockSize="10"
-    :infiniteInitialRowCount="10"
-    :maxConcurrentDatasourceRequests="1"
-    :maxBlocksInCache="10"
-    :datasource="dataSource2"
-    @grid-ready="onGridReady2"
-  />
+    :ref="dataTableRef"
+    :dataProvider="agGridDataProvider"
+    />
 </template>
 
 <style scoped>
@@ -62,38 +32,11 @@
 import DataTable from './components/DataTable.vue'
 import "ag-grid-community/styles/ag-grid.css"; // Mandatory CSS required by the Data Grid
 import "ag-grid-community/styles/ag-theme-quartz.css"; // Optional Theme applied to the Data Grid
-import { ref } from 'vue';
-
-
-import { AgGridVue } from "ag-grid-vue3"; // Vue Data Grid Component
-/** hello world table */
-/*
-
-const rowData = ref([
-   { make: "Tesla", model: "Model Y", price: 64950, electric: true },
-   { make: "Ford", model: "F-Series", price: 33850, electric: false },
-   { make: "Toyota", model: "Corolla", price: 29600, electric: false },
-]);
-
-const colDefs = ref([
-   { field: "make" },
-   { field: "model" },
-   { field: "price" },
-   { field: "electric" }
-]); */
-
-
-
-
-
-
-
-
-
-import { ColDef, GridApi, GridReadyEvent, IDatasource, ValueGetterParams } from 'ag-grid-community';
+import { onMounted, ref, VNodeRef } from 'vue';
 import { faker } from '@faker-js/faker';
 import { loadRemoteData, loadRemoteJsonl } from './stores/remoteDataLoader';
-
+import * as ColumnManager from '@/utils/columnManager';
+import { generateData } from './utils/dataGenerators';
 
 // TODO move this to autogen
 interface CommonPayloadData {
@@ -102,7 +45,6 @@ interface CommonPayloadData {
   entry: string;
   payload: Record<string, string>;
 }
-const commonKeys = new Set(['time', 'category', 'entry', 'payload']);
 
 
 // Fake data generator
@@ -114,7 +56,7 @@ const generateFakeRow = (index: number): CommonPayloadData => ({
 });
 
 // Fake async data fetcher
-const fetchData2_ = (startRow: number, endRow: number): Promise<CommonPayloadData[]> => {
+const fakeAsyncDataFetcher = (startRow: number, endRow: number): Promise<CommonPayloadData[]> => {
   return new Promise((resolve) => {
     setTimeout(() => {
       const rowData = [];
@@ -126,87 +68,12 @@ const fetchData2_ = (startRow: number, endRow: number): Promise<CommonPayloadDat
   });
 };
 
-const gridApi2 = ref<GridApi | null>(null);
-const columnDefs2 = ref<ColDef[]>([
-  {
-    headerName: "#",
-    valueGetter: (params: ValueGetterParams) => {
-      return (params.node?.rowIndex ?? 0) + 1;
-    },
-    width: 80,
-  },
-  { field: 'time' },
-  { field: 'category' },
-  { field: 'entry' },
-  {
-    headerName: 'Expandable Data',
-    valueGetter: (params: ValueGetterParams) => {
-      // return a canonicalized json string of the payload
-      // whose keys are not included in the default key list
-      const allData: any = params.data ?? {};
-      const filteredPayload = Object.keys(allData).filter(
-        key => !commonKeys.has(key)).reduce((obj: Record<string, string>, key) => {
-          obj[key] = allData[key];
-          return obj;
-        }, {});
-      return filteredPayload;
-    },
-    headerClass: 'my-ag-table-derived-column',
-    cellRenderer: (params: ValueGetterParams) => {
-      const stringRepresentation = JSON.stringify(params.value);
-      const numKeys = Object.keys(params.value).length;
-      return `<button onclick="alert(${numKeys})">(${numKeys}) ${stringRepresentation}</button>`;
-    },
-    cellRendererParams: {
-      onClick: () => alert('Button clicked'),
-    },
-  },
-  { field: 'payload' },
-]);
-
-const onGridReady2 = (params: GridReadyEvent) => {
-  gridApi2.value = params.api;
-/* 
-  const dataSource: IDatasource = {
-    getRows: (params) => {
-      console.log('Fetching rows:', params.startRow, 'to', params.endRow);
-      fetchData2(params.startRow, params.endRow).then(rowData => {
-        params.successCallback(rowData, 100000); // Assume 100,000 total rows
-      });
-    }
-  };
-
-  console.log("setting datasource", params.api);
-  params.api.setDatasource(dataSource); */
-};
-
 interface RowFetchWindow {
   rows: any[],
   startIndex: number,
   endIndex: number,
   totalRowCount: number,
 }
-
-const dataSource2 = ref<IDatasource>({
-  getRows: (params) => {
-    console.log('Fetching rows:', params.startRow, 'to', params.endRow, "out of");
-
-    true && fetchData2_(params.startRow, params.endRow).then(rowData => {
-      console.log("got rows", rowData);
-      params.successCallback(rowData, 100000);
-    });
-    // TODO remove this
-
-    false && fetchData2(params.startRow, params.endRow).then(rowData => {
-      console.log("got rows", rowData.rows, rowData.totalRowCount);
-      if(rowData.rows.length === 0) {
-        params.failCallback();
-      } else {
-        params.successCallback(rowData.rows, rowData.totalRowCount);
-      }
-    });
-  }
-});
 
 
 async function getFileHandle() {
@@ -222,9 +89,6 @@ async function getFileHandle() {
     });
   }
 }
-
-const tableRowsCache = ref<any[]>([]);
-const showTestTable = ref<boolean>(false);
 
 async function loadFile() {
   const fileHandle = await getFileHandle();
@@ -245,48 +109,74 @@ async function loadFile() {
     }
   }
   console.log('fileCache length:', parsedRows.length);
-  tableRowsCache.value = parsedRows;
+  agGridDataProvider.value = {
+    isInfinite: false,
+    rows: parsedRows,
+  };
 }
 
 
-const fetchData2 = async (startRow: number, endRow: number): Promise<RowFetchWindow> => {
-  console.log(tableRowsCache.value)
 
-  if (tableRowsCache.value.length >= endRow) {
-    return {
-      rows: tableRowsCache.value.slice(startRow, endRow),
-      startIndex: startRow,
-      endIndex: endRow,
-      totalRowCount: tableRowsCache.value.length,
-    };
-  }
-
-  return {
-    rows: [],
-    startIndex: 0,
-    endIndex: 0,
-    totalRowCount: 0,
-  };
-
-  if (tableRowsCache.value.length === 0) {
-    await loadFile();
-  }
-
-  return {
-    rows: tableRowsCache.value.slice(startRow, endRow),
-    startIndex: startRow,
-    endIndex: endRow,
-    totalRowCount: tableRowsCache.value.length,
-  };
-};
+const agGridDataProvider = ref<ColumnManager.AgGridDataProvider>();
+const dataTableRef = ref<VNodeRef | null>(null);
 
 const exampleLoadRemoteJsonl = async () => {
-  const data = await loadRemoteJsonl(345, 678);
-  tableRowsCache.value = data.rows;
+  const data = await loadRemoteJsonl(234, 567);
+  agGridDataProvider.value = {
+    isInfinite: false,
+    rows: data.rows,
+  };
 }
 
 const exampleLoadRemoteData = async () => {
   const data = await loadRemoteData(345, 678);
-  tableRowsCache.value = data.rows;
+  agGridDataProvider.value = {
+    isInfinite: false,
+    rows: data.rows,
+  };
 }
+
+const exampleLoadFiniteFakeData = async () => {
+  agGridDataProvider.value = {
+    isInfinite: false,
+    rows: generateData(19),
+  };
+}
+
+const loadInfiniteJsonlData = async () => {
+  // MOVE ME: this is the infinite datasource
+  agGridDataProvider.value = {
+    isInfinite: true,
+    rows: undefined,
+    infiniteDataGetter: async (startRow: number, endRow: number) => {
+      console.log('Fetching rows:', startRow, 'to', endRow);
+      return loadRemoteJsonl(startRow, endRow).then(data => {
+        return {
+          rows: data.rows,
+          totalRowCount: data.totalRowCount,
+        };
+      });
+    }
+  };
+}
+
+const loadInfiniteFakeData = async () => {
+  // MOVE ME: this is the infinite datasource
+  agGridDataProvider.value = {
+    isInfinite: true,
+    rows: undefined,
+    infiniteDataGetter: async (startRow: number, endRow: number) => {
+      console.log('Fetching rows:', startRow, 'to', endRow);
+      const data = generateData(endRow - startRow);
+      return {
+        rows: data,
+        totalRowCount: 123456,
+      };
+    }
+  };
+}
+
+onMounted(async () => {
+  exampleLoadFiniteFakeData();
+});
 </script>

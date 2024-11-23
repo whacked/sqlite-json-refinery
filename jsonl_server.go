@@ -26,7 +26,7 @@ type MyServer struct {
 
 // CountRecords returns the total count of records
 func (s *MyServer) CountRecords(ctx echo.Context) error {
-	return ctx.JSON(200, map[string]int{"count": s.TotalRecords})
+	return ctx.JSON(200, s.TotalRecords)
 }
 
 // ListRecords handles paginated listing of records

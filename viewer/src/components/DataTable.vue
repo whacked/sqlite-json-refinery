@@ -6,7 +6,9 @@
     </div>
     <div class="ag-grid-container ag-theme-alpine">
       <div>
-        {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${dataStore.totalRows} rows visible
+        {{ gridApi ? `${gridApi.getDisplayedRowCount()} / ${
+        props.dataProvider?.isInfinite ? _totalRowCount ?? "???" : props.dataProvider?.rows?.length ?? "NA"
+        } rows visible
         (${currentDisplayedRowsRange})` : '0 / 0 rows visible'
         }}; {{ totalExpandableRows }} expandable rows
       </div>
@@ -15,7 +17,13 @@
       <table class="data-keys-table">
         <tbody>
           <tr>
-            <th>rows</th><td>{{ props.rowData.length }}</td>
+            <th>rows</th>
+            <td
+            v-if="props.dataProvider?.isInfinite"
+            >infinite</td>
+            <td
+            v-else
+            >{{ props.dataProvider?.rows?.length ?? 0 }}</td>
           </tr>
 
           <tr>
@@ -210,62 +218,43 @@
       </details>
 
       <!--
-      NOTE: rowModelType: infinite is not supported with rowData;
-      to use generated data, x- out:
-        x-rowModelType="infinite"
-        :x-datasource="dataSource"
+      I could NOT get infinite and non-inifinite to work with a single ag-grid-vue component
       -->
       <ag-grid-vue
-        v-if="props.rowData.length == 0"
-
+        v-if="!props.dataProvider?.isInfinite"
         class="ag-theme-quartz main-grid"
         :columnDefs="columnDefs"
         :defaultColDef="defaultColDef"
         :components="components"
-
-        x-rowModelType="infinite"
-
-        :x-datasource="rowData.length > 0 ? dataSource : null"
-        :rowData="rowData"
-
+        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
         @keydown="onKeyDown"
+        @grid-ready="onGridReady"
+        @model-updated="onModelUpdated"
+        @first-data-rendered="onFirstDataRendered"
+        @body-scroll="onBodyScroll"
 
+        :rowData="_rowData"
+      >
+      </ag-grid-vue>
+      <ag-grid-vue
+        v-else
+        class="ag-theme-quartz main-grid"
+        :columnDefs="columnDefs"
+        :defaultColDef="defaultColDef"
+        :components="components"
+        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
+        @keydown="onKeyDown"
+        @grid-ready="onGridReady"
+        @model-updated="onModelUpdated"
+        @first-data-rendered="onFirstDataRendered"
+        @body-scroll="onBodyScroll"
+
+        :datasource="_dataSource"
+        rowModelType="infinite"
         :cacheBlockSize="cacheBlockSize"
         :infiniteInitialRowCount="infiniteInitialRowCount"
         :maxBlocksInCache="maxBlocksInCache"
         :rowBuffer="rowBuffer"
-        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
-        @grid-ready="onGridReady"
-        @model-updated="onModelUpdated"
-        @first-data-rendered="onFirstDataRendered"
-        @body-scroll="onBodyScroll"
-      >
-      </ag-grid-vue>
-
-      <ag-grid-vue
-        v-if="props.rowData.length > 0"
-
-        class="ag-theme-quartz main-grid"
-        :columnDefs="columnDefs"
-        :rowData="rowData"
-        :defaultColDef="defaultColDef"
-        :components="components"
-
-        :rowBuffer="rowBuffer"
-        :rowModelType="rowModelType"
-        :rowHeight="ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has('photo') || Array.from(ColumnManager.UsableColumns.columnsSet.value).filter(col => col.shouldDisplay && col.effectiveLookupPath.length == 1 && col.effectiveLookupPath[0] == 'photo').length > 0 ? 200 : null"
-
-        colon-paginationPageSize="paginationPageSize"
-
-        :cacheBlockSize="cacheBlockSize"
-        :infiniteInitialRowCount="infiniteInitialRowCount"
-
-        @keydown="onKeyDown"
-
-        @grid-ready="onGridReady"
-        @model-updated="onModelUpdated"
-        @first-data-rendered="onFirstDataRendered"
-        @body-scroll="onBodyScroll"
       >
       </ag-grid-vue>
 
@@ -273,8 +262,8 @@
         <label>
           <input type="checkbox" @change="togglePlot" />
           Show plot
+          <DataTablePlot :rowData="_rowData" :plotSettings="plotSettings" />
         </label>
-        <div ref="plotContainer"></div>
       </div>
       
     </div>
@@ -334,24 +323,27 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, defineComponent, h, Ref, watch } from 'vue';
+import { ref, onMounted, reactive, defineComponent, h, Ref, watch, computed } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
 import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
 import ExpandableCell from '@/components/ExpandableCell.vue';
 import CollapsableCell from '@/components/CollapsableCell.vue';
+import DataTablePlot from '@/components/DataTablePlot.vue';
+import { PlotSettings } from '@/components/DataTablePlot.vue';
 import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
-import { loadRemoteData } from '@/stores/remoteDataLoader';
+import { loadRemoteData, loadRemoteJsonl } from '@/stores/remoteDataLoader';
 import ColorizedNestedColumn from '@/components/ColorizedNestedColumn.vue';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
 import { Colorizer } from './styling';
 import { ColumnTransformation, ColumnRendererType } from '@/utils/columnManager';
+import * as Plotly from 'plotly.js-dist';
 
 
 const props = defineProps<{
-  rowData: any[];
+  dataProvider?: ColumnManager.AgGridDataProvider;
 }>();
 
 
@@ -360,7 +352,57 @@ const dataStore = useDataStore();
 const columnDefs = ref<ColDef[]>([]);
 const quickFilterText = ref('');
 const gridApi = ref<GridApi | null>(null);
-const rowData = ref<any[]>([]);
+const _rowData = ref<any[]>([]);
+const _totalRowCount = ref(0);
+const _dataSource: IDatasource = {
+  getRows: async (params) => {
+    if(!props.dataProvider || !props.dataProvider.isInfinite || !props.dataProvider.infiniteDataGetter) {
+      console.error("no infinite data provider");
+      return;
+    }
+
+    console.log("getRows", params);
+    const { startRow, endRow, successCallback, failCallback } = params;
+    
+    try {
+      const result = await props.dataProvider!.infiniteDataGetter!(startRow, endRow);
+      
+      // Assuming loadRemoteData returns an object with data and totalCount
+      const { rows, totalRowCount } = result;
+      _totalRowCount.value = totalRowCount;
+      console.log("fetched rows:", startRow, "to", endRow, "out of", totalRowCount);
+
+      if (startRow === 0) {
+        console.log(rows[0])
+        processRows(rows).then(processedRows => {
+          console.log("processed rows!!!", processedRows[0]);
+        });
+      }
+
+      // preprocess for ag-grid;
+      // something weird with json string escaping
+      // when triggered manually no problem;
+      // when used as infinite datasource, it has problem
+      for (const row of rows) {
+        if (row.payload) {
+          row.payload = JSON.parse(row.payload);
+          // Object.keys(row.payload).forEach(key => ColumnManager.detectedKeys.value.add(key));
+        }
+      }
+      
+      // If this is the last block of data, pass the actual row count
+      const lastRow = startRow + rows.length >= totalRowCount ? totalRowCount : undefined;
+      successCallback(rows, lastRow);
+    } catch (error) {
+      console.error('Error fetching remote data:', error);
+      failCallback();
+    }
+  }
+};
+const plotSettings = ref<PlotSettings>({
+  xColumn: null,
+  yColumn: null,
+});
 
 const maxBlocksInCache = ref(100);
 
@@ -477,13 +519,16 @@ const defaultColDef = reactive({
 });
 
 const rowBuffer = 40;
-const rowModelType = 'clientSide';
 const cacheBlockSize = 30;
 const infiniteInitialRowCount = 20;
 
 const onGridReady = (params: GridReadyEvent) => {
   gridApi.value = params.api;
-  processRows();
+  if(props.dataProvider && props.dataProvider.rows) {
+    processRows(props.dataProvider.rows).then(processedRows => {
+      _rowData.value = processedRows;
+    });
+  }
 };
 
 const autoSizeColumns = () => {
@@ -595,17 +640,17 @@ const extractUnits = async (column: ColumnManager.ColumnKey) => {
 
 const totalExpandableRows = ref<number>(0)
 
-const processRows = async () => {  // process the incoming data, derive columns etc
-  const sourceData = props.rowData?.length > 0 ? props.rowData : (await dataStore.fetchData(0, dataStore.totalRows));
+const processRows = async (sourceData: any[]): Promise<any[]> => {  // process the incoming data, derive columns etc
+  if(sourceData.length == 0) {
+    console.warn("no source data provided");
+    return [];
+  }
 
   ColumnManager.UsableColumns.reset();
-
-  rowData.value = sourceData.map(row => {
+  const processedRows = (!sourceData || sourceData.length == 0) ? [] : sourceData.map(row => {
     let expandableData: object | null = null;
 
     Object.keys(row).forEach(key => {
-
-
       if (key != ColumnManager.EXPANDABLE_DATA_COLUMN) {
 
         let renderType: ColumnRendererType | null = null;
@@ -671,9 +716,14 @@ const processRows = async () => {  // process the incoming data, derive columns 
       [ColumnManager.EXPANDABLE_DATA_COLUMN]: expandableData,
     }
   });
+
+  console.log(processedRows[0])
+  console.log(`processed ${processedRows.length} rows`);
+
   updateColumnDefs();
   updateRowCount();
-  console.log("processed rows");
+
+  return processedRows;
 };
 
 function makeExpandedColumnHeader() {
@@ -897,6 +947,10 @@ const updateColumnDefs = () => {
         key: col.effectiveLookupPath[0],
       },
       valueFormatter: (params: ValueFormatterParams) => {
+        if(params.data == null) {
+          return "";
+        }
+
         if (col.derivedFromColumn == null) {
           if (col.transformations?.includes(ColumnTransformation.NUMBER)) {
             return coerceToNumber(params.value) ?? "";
@@ -904,9 +958,9 @@ const updateColumnDefs = () => {
         }
         const value = params.data[col.apparentLookupPath];
         if(value === true) {
-          return "✔️";
+          return "🟢";
         } else if(value === false) {
-          return "❌";
+          return "🚫";
         } else {
           return value?.toString() ?? "";
         }
@@ -1007,7 +1061,7 @@ const toggleExpandExpandableKeys = (rowIndex: number) => {
     ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.delete(rowIndex);
   } else {
     ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.add(rowIndex);
-    const row = rowData.value[rowIndex];
+    const row = _rowData.value[rowIndex];
     if (row && row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
       Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
         ColumnManager.UsableColumns.setDisplayOn([ColumnManager.EXPANDABLE_DATA_COLUMN, key]);
@@ -1022,7 +1076,7 @@ const toggleContractExpandableKeys = (rowIndex: number) => {
     return;
   } else {
     ColumnManager.UsableColumns.visibleNestedDepthColumnDataRowIds.value.delete(rowIndex);
-    const row = rowData.value[rowIndex];
+    const row = _rowData.value[rowIndex];
     if (row && row[ColumnManager.EXPANDABLE_DATA_COLUMN]) {
       Object.keys(row[ColumnManager.EXPANDABLE_DATA_COLUMN]).forEach(key => {
         ColumnManager.UsableColumns.setDisplayOff([ColumnManager.EXPANDABLE_DATA_COLUMN, key]);
@@ -1038,7 +1092,7 @@ const toggleExpandCollapsibleKeys = (rowIndex: number) => {
     ColumnManager.collapsibleDataExpandedRows.value.delete(rowIndex);
   } else {
     ColumnManager.collapsibleDataExpandedRows.value.add(rowIndex);
-    const row = rowData.value[rowIndex];
+    const row = _rowData.value[rowIndex];
     if (row) {
       Object.keys(row).filter(
         key => !ColumnManager.SERIALIZED_CUSTOMARY_COLUMN_KEYS.value.has(key) && !ColumnManager.SPECIAL_COLUMN_KEYS.has(key)
@@ -1070,7 +1124,7 @@ const collapseAllCollapsibleRows = () => {
 
 const expandAllExpandableRows = () => {
   let isDirty = false;
-  rowData.value.forEach(row => {
+  _rowData.value.forEach(row => {
     if (row.payload) {
       const payloadKeys = Object.keys(row.payload);
       if (payloadKeys.length > 0) {
@@ -1105,8 +1159,8 @@ const onQuickFilterChanged = () => {
   });
 
   // DEBUG: display the first 5 rows's data in the COLLAPSABLE_DATA_COLUMN_SHADOW
-  console.log("first 5 rows's data in the COLLAPSABLE_DATA_COLUMN_SHADOW", rowData.value.slice(0, 5).map(row => row[ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]));
-  console.log("First 5 rows full data", rowData.value.slice(0, 5));
+  console.log("first 5 rows's data in the COLLAPSABLE_DATA_COLUMN_SHADOW", _rowData.value.slice(0, 5).map(row => row[ColumnManager.COLLAPSABLE_DATA_COLUMN_SHADOW]));
+  console.log("First 5 rows full data", _rowData.value.slice(0, 5));
 
   /* if (filterText.length === 0) {
     gridApi.value?.setFilterModel({});
@@ -1127,22 +1181,38 @@ const onQuickFilterChanged = () => {
   gridApi.value?.onFilterChanged();
 };
 
-onMounted(() => {
-});
+// Method to refresh the grid
+const refreshGrid = () => {
+  if (gridApi.value) {
+    gridApi.value.purgeInfiniteCache(); // This will clear the cache and reload data
+    // OR
+    gridApi.value.refreshInfiniteCache(); // This will refresh current data
+  }
+};
+
+// Expose the refresh method to the parent if needed
+defineExpose({ refreshGrid });
+
+watch(
+  () => props.dataProvider,
+  (newData, _) => {
+    console.log("newData", newData);
+    if (newData == null) {
+      return;
+    }
+
+    if(newData.isInfinite) {
+      console.log("PROCESSING isInfinite", newData);
+    } else {
+      processRows(newData.rows ?? []).then(processedRows => {
+        _rowData.value = processedRows;
+      });
+    }
+  },
+  { deep: true }
+);
 
 
-import * as Plotly from 'plotly.js-dist';
-import { parse } from 'vue/compiler-sfc';
-const plotContainer = ref(null);
-
-interface PlotSettings {
-  xColumn: ColumnKey | null;
-  yColumn: ColumnKey | null;
-}
-const plotSettings = ref<PlotSettings>({
-  xColumn: null,
-  yColumn: null,
-});
 
 // MOVEME
 function _getIn(obj: any, path: string[]) {
@@ -1192,7 +1262,7 @@ const togglePlot = (event: Event) => {
   const X: any[] = [];
   const Y: any[] = [];
 
-  for(const row of rowData.value) {
+  for(const row of _rowData.value) {
     console.log("row", row);
     // SUPER DUPER RISKY AND DIRTY
     X.push(ColumnManager.parseTimeValue(
@@ -1231,43 +1301,4 @@ const togglePlot = (event: Event) => {
   console.log(plot);
 }
 
-watch(
-  () => props.rowData,
-  (newData, _) => {
-    rowData.value = newData;
-    processRows();
-  },
-  { deep: true }
-);
-
-const dataSource: IDatasource = {
-  getRows: async (params) => {
-    const { startRow, endRow, successCallback, failCallback } = params;
-    
-    try {
-      const limit = endRow - startRow;
-      const result = await loadRemoteData(startRow, limit);
-      
-      // Assuming loadRemoteData returns an object with data and totalCount
-      const { rows, totalRowCount } = result;
-
-      // preprocess for ag-grid;
-      // something weird with json string escaping
-      // when triggered manually no problem;
-      // when used as infinite datasource, it has problem
-      for (const row of rows) {
-        row.payload = JSON.parse(row.payload);
-        // Object.keys(row.payload).forEach(key => ColumnManager.detectedKeys.value.add(key));
-      }
-      
-      // If this is the last block of data, pass the actual row count
-      const lastRow = startRow + rows.length >= totalRowCount ? totalRowCount : undefined;
-      
-      successCallback(rows, lastRow);
-    } catch (error) {
-      console.error('Error fetching remote data:', error);
-      failCallback();
-    }
-  }
-};
 </script>

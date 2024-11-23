@@ -11,7 +11,7 @@ export const useDataStore = defineStore('data', () => {
     console.log('Data store initialized');
   }
 
-  async function fetchData(startRow: number, endRow: number) {
+  async function fetchData(startRow: number, endRow: number): Promise<any[]> {
     // Simulate server delay
     await new Promise(resolve => setTimeout(resolve, 100));
 

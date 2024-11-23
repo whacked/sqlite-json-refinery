@@ -2,7 +2,7 @@
     <div class="time-cell"
     :style="{ background: backgroundColor }"
     >
-      {{ myDate != null ? myDate.toISOString() : "" }}
+      {{ myDate != null ? formatDate(props.params, myDate) : "" }}
     </div>
 </template>
 
@@ -27,6 +27,36 @@ const myDate = computed(() => {
   const maybeTimeValue = props.params.valueFormatted;
   return maybeTimeValue != null && maybeTimeValue != "" ? parseTimeValue(maybeTimeValue) : null;
 });
+
+const TIME_GRANULARITY_COLUMN = "time.granularity";
+
+function friendlifyDateString(s: string): string {
+  return s.replace("T", " ");
+}
+
+const formatDate = (rowParams: RenderParams, date: Date): string => {
+  const maybeTimeGranularity = rowParams.data[TIME_GRANULARITY_COLUMN];
+  let outString: string = date.toISOString();
+  if(maybeTimeGranularity != null) {
+    switch(maybeTimeGranularity) {
+      case "d":
+        outString = outString.substring(0, 10);
+        break;
+      case "H":
+        outString = outString.substring(0, 13);
+        break;
+      case "M":
+        outString = outString.substring(0, 16);
+        break;
+      case "S":
+        outString = outString.substring(0, 19);
+        break;
+      default:
+        break;
+    }
+  }
+  return friendlifyDateString(outString);
+}
 
 interface TimeBreakpoints {
   week: number;

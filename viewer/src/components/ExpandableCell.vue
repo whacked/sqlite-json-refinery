@@ -30,6 +30,13 @@ const payloadRenderable = computed(() => {
     const reducedPayload: Record<string, any> = {};
 
     for (const key of Object.keys(props.params.data[EXPANDABLE_DATA_COLUMN])) {
+        /*  expensive
+        if(typeof props.params.data[EXPANDABLE_DATA_COLUMN][key] == 'string') {
+            console.error(`${key} is not an object`);
+            continue;
+        }
+        */
+
         if (
             props.params.currentExpandedKeys.has(key)
         ) {
