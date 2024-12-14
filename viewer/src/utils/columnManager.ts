@@ -285,6 +285,7 @@ export function parseTimeValue(value: string | number | null | undefined): Date 
 
 export interface AgGridDataProvider {
     isInfinite: boolean;
+    name?: string;  // to indicate uinque data sets
     rows?: any[];
     infiniteDataGetter?: (startRow: number, endRow: number) => Promise<{ rows: any[], totalRowCount: number }>;
 }

@@ -323,7 +323,7 @@
 </style>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, defineComponent, h, Ref, watch, computed } from 'vue';
+import { ref, reactive, defineComponent, h, Ref, watch } from 'vue';
 import { AgGridVue } from 'ag-grid-vue3';
 import { BodyScrollEvent, ColDef, GridApi, GridReadyEvent, IDatasource, ValueFormatterParams, ValueGetterParams } from 'ag-grid-community';
 import { useDataStore } from '@/stores/dataStore';
@@ -333,7 +333,6 @@ import DataTablePlot from '@/components/DataTablePlot.vue';
 import { PlotSettings } from '@/components/DataTablePlot.vue';
 import PhotoCell from '@/components/PhotoCell.vue';
 import * as ColumnManager from '@/utils/columnManager';
-import { loadRemoteData, loadRemoteJsonl } from '@/stores/remoteDataLoader';
 import ColorizedNestedColumn from '@/components/ColorizedNestedColumn.vue';
 import TimeCell from '@/components/TimeCell.vue';
 import ColorizedCategoricalCell from '@/components/ColorizedCategoricalCell.vue';
@@ -647,6 +646,7 @@ const processRows = async (sourceData: any[]): Promise<any[]> => {  // process t
   }
 
   ColumnManager.UsableColumns.reset();
+  totalExpandableRows.value = 0;
   const processedRows = (!sourceData || sourceData.length == 0) ? [] : sourceData.map(row => {
     let expandableData: object | null = null;
 
@@ -1195,14 +1195,21 @@ defineExpose({ refreshGrid });
 
 watch(
   () => props.dataProvider,
-  (newData, _) => {
+  (newData, oldData) => {
     console.log("newData", newData);
     if (newData == null) {
       return;
     }
 
+    if(newData.name == oldData?.name) {
+      return;
+    }
+
     if(newData.isInfinite) {
-      console.log("PROCESSING isInfinite", newData);
+      // force vue to refresh the component;
+      // _dataSource won't detect the change because we swap out the
+      // underlying data provider
+      gridApi.value?.refreshInfiniteCache();
     } else {
       processRows(newData.rows ?? []).then(processedRows => {
         _rowData.value = processedRows;

@@ -147,6 +147,7 @@ const loadInfiniteJsonlData = async () => {
   // MOVE ME: this is the infinite datasource
   agGridDataProvider.value = {
     isInfinite: true,
+    name: "infiniteJsonlData",
     rows: undefined,
     infiniteDataGetter: async (startRow: number, endRow: number) => {
       console.log('Fetching rows:', startRow, 'to', endRow);
@@ -164,6 +165,7 @@ const loadInfiniteFakeData = async () => {
   // MOVE ME: this is the infinite datasource
   agGridDataProvider.value = {
     isInfinite: true,
+    name: "infiniteFakeData",
     rows: undefined,
     infiniteDataGetter: async (startRow: number, endRow: number) => {
       console.log('Fetching rows:', startRow, 'to', endRow);
