@@ -29,9 +29,9 @@ const BASE_PHOTO_PATH = 'http://localhost:7002/';
 // Use environment variable or build-time config for this
 const IS_TEST_MODE = import.meta.env.MODE === 'development';
 const TEST_PHOTO_URLS = [
-    'https://picsum.photos/200/300',
-    'https://picsum.photos/200/301',
-    'https://picsum.photos/200/302'
+    'data:image/svg+xml,%3Csvg width="200" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="100%25" height="100%25" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif"%3ETest Image 1%3C/text%3E%3C/svg%3E',
+    'data:image/svg+xml,%3Csvg width="200" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="100%25" height="100%25" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif"%3ETest Image 2%3C/text%3E%3C/svg%3E',
+    'data:image/svg+xml,%3Csvg width="200" height="300" xmlns="http://www.w3.org/2000/svg"%3E%3Crect width="100%25" height="100%25" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif"%3ETest Image 3%3C/text%3E%3C/svg%3E'
 ];
 
 function makePhotoPath(photo: string) {

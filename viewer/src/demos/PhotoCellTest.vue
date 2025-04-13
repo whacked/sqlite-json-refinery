@@ -36,7 +36,7 @@ const testParams = computed(() => ({
 
 <style scoped>
 .test-container {
-    padding: 20px;
+    padding: 15px;
 }
 
 .controls {
@@ -49,6 +49,6 @@ const testParams = computed(() => ({
 
 .test-component {
     border: 1px solid #ccc;
-    padding: 20px;
+    padding: 10px;
 }
 </style>
