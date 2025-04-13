@@ -69,7 +69,8 @@ in pkgs.mkShell {
     go-jsonschema
     pkgs.oapi-codegen
 
-    ws4sqlite  # Added here
+    ws4sqlite
+    pkgs.static-web-server
   ] ++ [
     # frontend
     pkgs.nodePackages.nodejs
@@ -93,6 +94,7 @@ in pkgs.mkShell {
     }
 
     alias serve-database="ws4sqlite -db"
+    alias serve-static-media="static-web-server --root $STATICDATA/mmc/DCIM --port 7002"
   '' + ''
     echo-shortcuts ${__curPos.file}
   '';
