@@ -9,18 +9,24 @@ let
 
   ws4sqlite = pkgs.stdenv.mkDerivation {
     pname = "ws4sqlite";
-    version = "0.16.2";
+    version = "0.16.3";
     
-    src = pkgs.fetchurl {
-      url = "https://github.com/proofrock/ws4sqlite/releases/download/v0.16.2/ws4sqlite-v0.16.2-linux-amd64.tar.gz";
-      hash = "sha256-2scK/60xHGM5VkQq0ywl0eoEpL/yarebNQbkcYBmxyI=";
+    src = if pkgs.stdenv.isDarwin then
+      pkgs.fetchzip {
+        url = "https://github.com/proofrock/ws4sqlite/releases/download/v0.16.3/ws4sqlite-v0.16.3-darwin-arm64.zip";
+        hash = "sha256-MLlDrMi0zum4sH7Eks1xJ94PHyqmazaFIA2L2olgjWY=";
+      }
+    else
+      pkgs.fetchzip {
+        url = "https://github.com/proofrock/ws4sqlite/releases/download/v0.16.3/ws4sqlite-v0.16.3-linux-amd64.tar.gz";
+        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     };
     
     sourceRoot = ".";
     
     installPhase = ''
       mkdir -p $out/bin
-      cp ws4sqlite $out/bin/
+      cp ./source/ws4sqlite $out/bin/
       chmod +x $out/bin/ws4sqlite
     '';
   };
@@ -66,6 +72,7 @@ in pkgs.mkShell {
     ws4sqlite  # Added here
   ] ++ [
     # frontend
+    pkgs.nodePackages.nodejs
     pkgs.nodePackages.pnpm
 
   ] ++ nix_shortcuts.buildInputs;
