@@ -103,8 +103,9 @@ async function loadFile() {
             }
         }
     }
-    console.log('fileCache length:', parsedRows.length);
+    console.log(`fileCache length from ${file.name}:`, parsedRows.length);
     agGridDataProvider.value = {
+        name: file.name,
         isInfinite: false,
         rows: parsedRows,
     };
@@ -118,6 +119,7 @@ const dataTableRef = ref<VNodeRef | null>(null);
 const exampleLoadRemoteJsonl = async () => {
     const data = await loadRemoteJsonl(234, 567);
     agGridDataProvider.value = {
+        name: "remoteJsonlData",
         isInfinite: false,
         rows: data.rows,
     };
@@ -126,6 +128,7 @@ const exampleLoadRemoteJsonl = async () => {
 const exampleLoadRemoteData = async () => {
     const data = await loadRemoteData(345, 678);
     agGridDataProvider.value = {
+        name: "exampleRemoteData",
         isInfinite: false,
         rows: data.rows,
     };
@@ -133,6 +136,7 @@ const exampleLoadRemoteData = async () => {
 
 const exampleLoadFiniteFakeData = async () => {
     agGridDataProvider.value = {
+        name: "exampleFiniteFakeData",
         isInfinite: false,
         rows: generateData(19),
     };
